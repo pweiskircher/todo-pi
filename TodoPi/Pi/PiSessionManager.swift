@@ -48,6 +48,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     private var startupTask: Task<Void, Error>?
     private var stderrText = ""
     private var streamedAssistantText = ""
+    private var lastNotice: String?
 
     init(
         launchConfiguration: PiLaunchConfiguration?,
@@ -114,6 +115,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         stderrText = ""
         stdoutFramer = PiJSONLFramer()
         streamedAssistantText = ""
+        lastNotice = nil
 
         if let validationError = launchConfiguration.validationError {
             state = .failed(validationError)
@@ -243,6 +245,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             switch event {
             case .agentStart:
                 state = .busy
+                emitSystemNotice("pi is working…")
             case .agentEnd:
                 state = .ready
             case .turnStart:
@@ -251,18 +254,22 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
                 if role == "assistant" {
                     finalizeAssistantMessage(fallbackText: text)
                 }
-            case .messageStart:
-                break
+            case let .messageStart(role):
+                if role == "assistant" {
+                    emitSystemNotice("pi is drafting a response…")
+                }
             case let .messageUpdate(update):
                 handleAssistantMessageUpdate(update)
             case let .messageEnd(role, text):
                 if role == "assistant" {
                     finalizeAssistantMessage(fallbackText: text)
                 }
-            case .toolExecutionStart, .toolExecutionEnd:
-                break
+            case let .toolExecutionStart(toolName):
+                emitSystemNotice("running tool: \(toolName)")
+            case let .toolExecutionEnd(toolName, isError):
+                emitSystemNotice(isError ? "tool failed: \(toolName)" : "finished tool: \(toolName)")
             case let .extensionError(error):
-                eventSubject.send(.systemNotice(error))
+                emitSystemNotice(error)
                 state = .failed(error)
             case .unknown:
                 break
@@ -307,6 +314,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
 
         if let finalText {
             eventSubject.send(.assistantMessageCompleted(finalText))
+            lastNotice = nil
         }
 
         streamedAssistantText = ""
@@ -330,11 +338,24 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             state = .stopped
             failPendingResponses(with: CancellationError())
         } else {
-            eventSubject.send(.systemNotice(statusMessage))
+            emitSystemNotice(statusMessage)
             state = .failed(statusMessage)
             let error = NSError(domain: "TodoPi.PiSessionManager", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: statusMessage])
             failPendingResponses(with: error)
         }
+    }
+
+    private func emitSystemNotice(_ text: String) {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
+            return
+        }
+        guard lastNotice != trimmedText else {
+            return
+        }
+
+        lastNotice = trimmedText
+        eventSubject.send(.systemNotice(trimmedText))
     }
 
     private func failPendingResponses(with error: Error) {
