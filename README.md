@@ -1,5 +1,7 @@
 # TodoPi
 
+![TodoPi screenshot](docs/assets/todopi-screenshot.png)
+
 TodoPi is a native macOS menubar todo app with a built-in chat panel for working with `pi`.
 
 It stores todos locally, opens as a normal standalone window, and lets `pi` read and update your todo lists through an app-owned bridge.
