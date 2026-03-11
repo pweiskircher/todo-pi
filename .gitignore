@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Xcode user and generated workspace data
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+TodoPi.xcodeproj/project.xcworkspace/
+
+# Local build outputs
+DerivedData/
+build/
