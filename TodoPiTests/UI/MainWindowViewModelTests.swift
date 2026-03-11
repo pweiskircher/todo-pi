@@ -87,6 +87,22 @@ final class MainWindowViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.selectedList)
     }
 
+    func testInlineRenameAndMoveTodosMutateStore() {
+        let firstTodo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "First")
+        let secondTodo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000011"), title: "Second").withSortOrder(1)
+        let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([firstTodo, secondTodo])
+        let store = TodoStore(document: TodoDocument.empty().withLists([list]))
+        let viewModel = makeViewModel(store: store)
+
+        viewModel.renameList(id: list.id, title: "Renamed Inbox")
+        viewModel.renameTodoTitle(id: firstTodo.id, title: "Renamed First")
+        viewModel.moveTodos(fromOffsets: IndexSet(integer: 1), toOffset: 0)
+
+        XCTAssertEqual(viewModel.selectedList?.title, "Renamed Inbox")
+        XCTAssertEqual(viewModel.selectedList?.todos.map(\.title), ["Second", "Renamed First"])
+        XCTAssertEqual(viewModel.selectedList?.todos.map(\.sortOrder), [0, 1])
+    }
+
     private func makeViewModel(store: TodoStore) -> MainWindowViewModel {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -136,6 +152,14 @@ private extension TodoList {
     func withTodos(_ todos: [TodoItem]) -> TodoList {
         var copy = self
         copy.todos = todos
+        return copy
+    }
+}
+
+private extension TodoItem {
+    func withSortOrder(_ sortOrder: Int) -> TodoItem {
+        var copy = self
+        copy.sortOrder = sortOrder
         return copy
     }
 }

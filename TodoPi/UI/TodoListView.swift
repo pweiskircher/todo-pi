@@ -3,6 +3,10 @@ import SwiftUI
 struct TodoListView: View {
     @ObservedObject var viewModel: MainWindowViewModel
 
+    @State private var editingTodoID: UUID?
+    @State private var editingTodoTitle = ""
+    @State private var pendingDeleteTodo: TodoItem?
+
     var body: some View {
         Group {
             if let list = viewModel.selectedList {
@@ -28,6 +32,22 @@ struct TodoListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .alert("Delete Todo?", isPresented: Binding(
+            get: { pendingDeleteTodo != nil },
+            set: { if !$0 { pendingDeleteTodo = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let pendingDeleteTodo {
+                    viewModel.deleteTodo(id: pendingDeleteTodo.id)
+                }
+                pendingDeleteTodo = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteTodo = nil
+            }
+        } message: {
+            Text("This will permanently delete \(pendingDeleteTodo?.title ?? "this todo").")
+        }
     }
 
     private func todoListSection(for list: TodoList) -> some View {
@@ -47,45 +67,26 @@ struct TodoListView: View {
                     )
                 ) {
                     ForEach(sortedTodos(in: list)) { todo in
-                        HStack(alignment: .top, spacing: 12) {
-                            Button {
-                                viewModel.toggleCompletion(for: todo.id)
-                            } label: {
-                                Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(todo.isCompleted ? .green : .secondary)
-                            }
-                            .buttonStyle(.borderless)
+                        row(for: todo)
+                            .tag(Optional(todo.id))
+                            .contextMenu {
+                                Button("Rename") {
+                                    beginEditing(todo)
+                                }
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(todo.title)
-                                    .lineLimit(2)
-                                    .strikethrough(todo.isCompleted)
-                                    .foregroundStyle(todo.isCompleted ? .secondary : .primary)
+                                Button(todo.isCompleted ? "Mark Incomplete" : "Mark Complete") {
+                                    viewModel.toggleCompletion(for: todo.id)
+                                }
 
-                                if let notes = todo.notes, !notes.isEmpty {
-                                    Text(notes)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
+                                Divider()
+
+                                Button("Delete Todo", role: .destructive) {
+                                    pendingDeleteTodo = todo
                                 }
                             }
-
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                        .tag(Optional(todo.id))
-                        .contextMenu {
-                            Button(todo.isCompleted ? "Mark Incomplete" : "Mark Complete") {
-                                viewModel.toggleCompletion(for: todo.id)
-                            }
-
-                            Divider()
-
-                            Button("Delete Todo", role: .destructive) {
-                                viewModel.deleteTodo(id: todo.id)
-                            }
-                        }
+                    }
+                    .onMove { indices, newOffset in
+                        viewModel.moveTodos(fromOffsets: indices, toOffset: newOffset)
                     }
                 }
                 .listStyle(.inset)
@@ -94,7 +95,7 @@ struct TodoListView: View {
     }
 
     private func header(for list: TodoList) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 TextField("List title", text: $viewModel.listTitleDraft)
                     .textFieldStyle(.roundedBorder)
@@ -108,14 +109,22 @@ struct TodoListView: View {
                     viewModel.saveListTitle()
                 }
 
-                Button("New Todo") {
+                Spacer()
+
+                Button {
                     viewModel.createTodo()
+                } label: {
+                    Label("New Todo", systemImage: "plus")
                 }
             }
 
             let completedCount = list.todos.filter(\.isCompleted).count
             Text("\(completedCount) of \(list.todos.count) completed")
                 .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Text("Drag todos to reorder. Double-click a todo title to rename it inline.")
+                .font(.caption)
                 .foregroundStyle(.secondary)
 
             if let editorErrorDescription = viewModel.editorErrorDescription {
@@ -175,6 +184,59 @@ struct TodoListView: View {
             }
         }
         .padding(16)
+    }
+
+    @ViewBuilder
+    private func row(for todo: TodoItem) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Button {
+                viewModel.toggleCompletion(for: todo.id)
+            } label: {
+                Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(todo.isCompleted ? .green : .secondary)
+            }
+            .buttonStyle(.borderless)
+
+            VStack(alignment: .leading, spacing: 4) {
+                if editingTodoID == todo.id {
+                    TextField("Todo title", text: $editingTodoTitle)
+                        .textFieldStyle(.plain)
+                        .onSubmit {
+                            commitEditing(todo)
+                        }
+                } else {
+                    Text(todo.title)
+                        .lineLimit(2)
+                        .strikethrough(todo.isCompleted)
+                        .foregroundStyle(todo.isCompleted ? .secondary : .primary)
+                }
+
+                if let notes = todo.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            beginEditing(todo)
+        }
+    }
+
+    private func beginEditing(_ todo: TodoItem) {
+        viewModel.selectTodo(id: todo.id)
+        editingTodoID = todo.id
+        editingTodoTitle = todo.title
+    }
+
+    private func commitEditing(_ todo: TodoItem) {
+        viewModel.renameTodoTitle(id: todo.id, title: editingTodoTitle)
+        editingTodoID = nil
     }
 
     private func sortedTodos(in list: TodoList) -> [TodoItem] {

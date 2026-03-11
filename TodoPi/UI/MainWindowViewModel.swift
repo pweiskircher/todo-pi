@@ -155,8 +155,12 @@ final class MainWindowViewModel: ObservableObject {
             return
         }
 
+        renameList(id: list.id, title: listTitleDraft)
+    }
+
+    func renameList(id: UUID, title: String) {
         do {
-            _ = try commandService.updateListTitle(listID: list.id, title: listTitleDraft)
+            _ = try commandService.updateListTitle(listID: id, title: title)
             editorErrorDescription = nil
         } catch {
             editorErrorDescription = error.localizedDescription
@@ -177,6 +181,23 @@ final class MainWindowViewModel: ObservableObject {
         }
     }
 
+    func renameTodoTitle(id: UUID, title: String) {
+        guard let list = selectedList else {
+            return
+        }
+
+        do {
+            _ = try commandService.updateTodo(
+                in: list.id,
+                todoID: id,
+                request: TodoUpdateRequest(title: title, notes: .preserve)
+            )
+            editorErrorDescription = nil
+        } catch {
+            editorErrorDescription = error.localizedDescription
+        }
+    }
+
     func discardTodoEdits() {
         editorErrorDescription = nil
         syncEditorDrafts()
@@ -190,6 +211,29 @@ final class MainWindowViewModel: ObservableObject {
 
         do {
             _ = try commandService.setTodoCompletion(in: list.id, todoID: todoID, isCompleted: !todo.isCompleted)
+            editorErrorDescription = nil
+        } catch {
+            editorErrorDescription = error.localizedDescription
+        }
+    }
+
+    func moveTodos(fromOffsets: IndexSet, toOffset: Int) {
+        guard let list = selectedList else {
+            return
+        }
+
+        var desiredIDs = sortedTodos(in: list).map(\.id)
+        desiredIDs.move(fromOffsets: fromOffsets, toOffset: toOffset)
+
+        do {
+            for targetIndex in desiredIDs.indices {
+                guard let currentList = selectedList else { break }
+                let currentIDs = sortedTodos(in: currentList).map(\.id)
+                let desiredID = desiredIDs[targetIndex]
+                if currentIDs[targetIndex] != desiredID {
+                    _ = try commandService.moveTodo(in: list.id, todoID: desiredID, to: targetIndex)
+                }
+            }
             editorErrorDescription = nil
         } catch {
             editorErrorDescription = error.localizedDescription
@@ -256,6 +300,15 @@ final class MainWindowViewModel: ObservableObject {
             index += 1
         }
         return "\(base) \(index)"
+    }
+
+    private func sortedTodos(in list: TodoList) -> [TodoItem] {
+        list.todos.sorted { lhs, rhs in
+            if lhs.sortOrder == rhs.sortOrder {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.sortOrder < rhs.sortOrder
+        }
     }
 
     private static func todoBodyText(from todo: TodoItem) -> String {

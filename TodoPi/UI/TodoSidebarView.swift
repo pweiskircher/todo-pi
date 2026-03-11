@@ -3,24 +3,15 @@ import SwiftUI
 struct TodoSidebarView: View {
     @ObservedObject var viewModel: MainWindowViewModel
 
+    @State private var editingListID: UUID?
+    @State private var editingListTitle = ""
+    @State private var pendingDeleteList: TodoList?
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("Lists", systemImage: "sidebar.left")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+        VStack(alignment: .leading, spacing: 0) {
+            header
 
-                Spacer()
-
-                Button {
-                    viewModel.createList()
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .help("New List")
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
+            Divider()
 
             if viewModel.lists.isEmpty {
                 ContentUnavailableView(
@@ -37,31 +28,100 @@ struct TodoSidebarView: View {
                     )
                 ) {
                     ForEach(viewModel.lists) { list in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(list.title)
-                                .fontWeight(.medium)
-                            Text("\(list.todos.count) todos")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .tag(Optional(list.id))
-                        .contextMenu {
-                            Button("New Todo") {
-                                viewModel.selectList(id: list.id)
-                                viewModel.createTodo()
-                            }
+                        row(for: list)
+                            .tag(Optional(list.id))
+                            .contextMenu {
+                                Button("Rename") {
+                                    beginEditing(list)
+                                }
 
-                            Divider()
+                                Button("New Todo") {
+                                    viewModel.selectList(id: list.id)
+                                    viewModel.createTodo()
+                                }
 
-                            Button("Delete List", role: .destructive) {
-                                viewModel.deleteList(id: list.id)
+                                Divider()
+
+                                Button("Delete List", role: .destructive) {
+                                    pendingDeleteList = list
+                                }
                             }
-                        }
                     }
                 }
                 .listStyle(.sidebar)
             }
         }
         .frame(minWidth: 220)
+        .alert("Delete List?", isPresented: Binding(
+            get: { pendingDeleteList != nil },
+            set: { if !$0 { pendingDeleteList = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let pendingDeleteList {
+                    viewModel.deleteList(id: pendingDeleteList.id)
+                }
+                pendingDeleteList = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteList = nil
+            }
+        } message: {
+            Text("This will permanently delete \(pendingDeleteList?.title ?? "this list") and all of its todos.")
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            Label("Lists", systemImage: "sidebar.left")
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            Spacer()
+
+            Button {
+                viewModel.createList()
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+            .help("New List")
+        }
+        .padding(16)
+    }
+
+    @ViewBuilder
+    private func row(for list: TodoList) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if editingListID == list.id {
+                TextField("List title", text: $editingListTitle)
+                    .textFieldStyle(.plain)
+                    .fontWeight(.medium)
+                    .onSubmit {
+                        commitEditingList(list)
+                    }
+            } else {
+                Text(list.title)
+                    .fontWeight(.medium)
+            }
+
+            Text("\(list.todos.count) todos")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            beginEditing(list)
+        }
+    }
+
+    private func beginEditing(_ list: TodoList) {
+        viewModel.selectList(id: list.id)
+        editingListID = list.id
+        editingListTitle = list.title
+    }
+
+    private func commitEditingList(_ list: TodoList) {
+        viewModel.renameList(id: list.id, title: editingListTitle)
+        editingListID = nil
     }
 }
