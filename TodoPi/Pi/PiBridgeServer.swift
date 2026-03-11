@@ -88,6 +88,7 @@ final class PiBridgeServer {
 
     func start() throws {
         stop()
+        PiDebugLog.write("Starting bridge server at \(socketURL.path)")
 
         try FileManager.default.createDirectory(
             at: socketURL.deletingLastPathComponent(),
@@ -156,6 +157,7 @@ final class PiBridgeServer {
         acceptSource = nil
 
         if socketFD != -1 {
+            PiDebugLog.write("Stopping bridge server at \(socketURL.path)")
             socketFD = -1
         }
 
@@ -170,15 +172,21 @@ final class PiBridgeServer {
         let response: PiBridgeResponse
         do {
             let request = try JSONDecoder().decode(PiBridgeRequest.self, from: requestData)
+            PiDebugLog.write("Bridge request tool=\(request.tool) arguments=\(describe(arguments: request.arguments))")
+
             if request.token != authToken {
+                PiDebugLog.write("Bridge request rejected: invalid auth token for tool=\(request.tool)")
                 response = .failure(code: "unauthorized", message: "invalid auth token")
             } else {
                 response = requestHandler(request)
             }
         } catch {
+            let rawText = String(data: requestData, encoding: .utf8) ?? "<non-utf8 request: \(requestData.count) bytes>"
+            PiDebugLog.write("Bridge request decode failed: \(error.localizedDescription) raw=\(rawText.replacingOccurrences(of: authToken, with: "<redacted>"))")
             response = .failure(code: "invalid_request", message: error.localizedDescription)
         }
 
+        PiDebugLog.write("Bridge response success=\(response.isSuccess) errorCode=\(response.errorCode ?? "nil") message=\(response.message ?? "nil")")
         let data = (try? JSONEncoder().encode(response)) ?? Data("{\"isSuccess\":false,\"errorCode\":\"encoding_failed\",\"message\":\"failed to encode response\"}".utf8)
         var framed = data
         framed.append(0x0A)
@@ -310,6 +318,19 @@ final class PiBridgeServer {
             throw NSError(domain: "TodoPi.PiBridgeServer", code: 3, userInfo: [NSLocalizedDescriptionKey: "Missing integer argument: \(name)"])
         }
         return value
+    }
+
+    private func describe(arguments: [String: JSONValue]) -> String {
+        guard !arguments.isEmpty else {
+            return "{}"
+        }
+
+        if let data = try? JSONEncoder().encode(arguments),
+           let text = String(data: data, encoding: .utf8) {
+            return text
+        }
+
+        return "<unencodable arguments>"
     }
 
     private static func jsonValue<T: Encodable>(from value: T) throws -> JSONValue {

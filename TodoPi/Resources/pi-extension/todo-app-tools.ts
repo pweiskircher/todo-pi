@@ -1,6 +1,9 @@
 import { Type } from "@sinclair/typebox";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import fs from "node:fs";
 import net from "node:net";
+import os from "node:os";
+import path from "node:path";
 
 type BridgeResponse = {
   isSuccess: boolean;
@@ -8,6 +11,26 @@ type BridgeResponse = {
   errorCode?: string;
   message?: string;
 };
+
+const debugLogPath = path.join(os.tmpdir(), "pi-todo.log");
+
+function debugLog(message: string, details?: unknown) {
+  const suffix = details === undefined ? "" : ` ${safeJSONStringify(details)}`;
+
+  try {
+    fs.appendFileSync(debugLogPath, `${new Date().toISOString()} [extension] ${message}${suffix}\n`);
+  } catch {
+    // Best-effort debug logging only.
+  }
+}
+
+function safeJSONStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
 
 function getBridgeConfig() {
   const socketPath = process.env.TODO_PI_SOCKET;
@@ -22,12 +45,14 @@ function getBridgeConfig() {
 async function callBridge(tool: string, args: Record<string, unknown> = {}): Promise<BridgeResponse> {
   const { socketPath, token } = getBridgeConfig();
   const payload = JSON.stringify({ token, tool, arguments: args }) + "\n";
+  debugLog("bridge request", { tool, arguments: args });
 
   return await new Promise<BridgeResponse>((resolve, reject) => {
     const socket = net.createConnection(socketPath);
     let buffer = "";
 
     socket.on("connect", () => {
+      debugLog("bridge socket connected", { tool, socketPath });
       socket.write(payload);
     });
 
@@ -40,19 +65,25 @@ async function callBridge(tool: string, args: Record<string, unknown> = {}): Pro
       socket.end();
 
       try {
-        resolve(JSON.parse(line) as BridgeResponse);
+        const response = JSON.parse(line) as BridgeResponse;
+        debugLog("bridge response", { tool, response });
+        resolve(response);
       } catch (error) {
+        debugLog("bridge response parse failed", { tool, line, error: String(error) });
         reject(error);
       }
     });
 
     socket.on("error", (error) => {
+      debugLog("bridge socket error", { tool, error: String(error) });
       reject(error);
     });
 
     socket.on("end", () => {
       if (buffer.length === 0) {
-        reject(new Error("Bridge closed connection without a response"));
+        const error = new Error("Bridge closed connection without a response");
+        debugLog("bridge socket ended without a response", { tool });
+        reject(error);
       }
     });
   });
@@ -66,12 +97,19 @@ function resultText(payload: unknown): string {
 
 function normalizeArguments(params: unknown): Record<string, unknown> {
   if (!params || typeof params !== "object" || Array.isArray(params)) {
+    debugLog("normalizing non-object tool arguments to empty object", { receivedType: typeof params, value: params ?? null });
     return {};
   }
 
-  return Object.fromEntries(
+  const normalized = Object.fromEntries(
     Object.entries(params as Record<string, unknown>).filter(([key, value]) => key.trim().length > 0 && value !== undefined)
   );
+
+  if (Object.keys(normalized).length !== Object.keys(params as Record<string, unknown>).length) {
+    debugLog("dropped invalid tool argument keys while normalizing", { original: params, normalized });
+  }
+
+  return normalized;
 }
 
 function registerBridgeTool(pi: ExtensionAPI, options: {
@@ -86,8 +124,12 @@ function registerBridgeTool(pi: ExtensionAPI, options: {
     description: options.description,
     parameters: options.parameters,
     async execute(_toolCallId, params) {
-      const response = await callBridge(options.name, normalizeArguments(params));
+      const normalizedArguments = normalizeArguments(params);
+      debugLog("executing bridge tool", { tool: options.name, params, normalizedArguments });
+
+      const response = await callBridge(options.name, normalizedArguments);
       if (!response.isSuccess) {
+        debugLog("bridge tool failed", { tool: options.name, response });
         throw new Error(`${response.errorCode ?? "bridge_error"}: ${response.message ?? "request failed"}`);
       }
 

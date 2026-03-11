@@ -76,6 +76,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         switch state {
         case .ready, .busy:
             if shouldRestartManagedProcessForConfigurationChange() {
+                PiDebugLog.write("Restarting pi because the bundled extension fingerprint changed")
                 stop()
                 break
             }
@@ -114,6 +115,8 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     }
 
     func stop() {
+        PiDebugLog.write("Stopping pi session manager")
+
         if let process {
             process.terminationHandler = nil
             terminateManagedProcess(process.processIdentifier)
@@ -138,6 +141,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         stderrText = ""
         stdoutFramer = PiJSONLFramer()
         resetStreamingState()
+        PiDebugLog.write("Starting pi process")
 
         if let validationError = launchConfiguration.validationError {
             state = .failed(validationError)
@@ -156,6 +160,8 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             state = .failed(error.localizedDescription)
             throw error
         }
+
+        PiDebugLog.write("Launching pi executable=\(executableURL.path) extension=\(launchConfiguration.extensionURL.path) fingerprint=\(launchConfiguration.extensionFingerprint ?? "nil")")
 
         let process = Process()
         let stdinPipe = Pipe()
@@ -246,6 +252,10 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             throw NSError(domain: "TodoPi.PiSessionManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "pi stdin is not available"])
         }
 
+        if let text = String(data: data, encoding: .utf8) {
+            PiDebugLog.write("sending rpc command: \(text)")
+        }
+
         var framed = data
         framed.append(0x0A)
         try stdinHandle.write(contentsOf: framed)
@@ -267,9 +277,11 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             return
         }
         stderrText += text
+        PiDebugLog.write("pi stderr: \(text.trimmingCharacters(in: .whitespacesAndNewlines))")
     }
 
     private func handle(_ message: PiRPCMessage) {
+        PiDebugLog.write("pi rpc message: \(String(describing: message))")
         switch message {
         case let .response(response):
             if let id = response.id, let handler = pendingResponses.removeValue(forKey: id) {
@@ -486,6 +498,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     }
 
     private func handleTermination(_ process: Process) {
+        PiDebugLog.write("pi terminated reason=\(process.terminationReason.rawValue) status=\(process.terminationStatus)")
         self.process = nil
         stdinHandle = nil
         bridgeServer.stop()
