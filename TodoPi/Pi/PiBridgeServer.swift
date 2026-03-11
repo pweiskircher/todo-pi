@@ -203,10 +203,21 @@ final class PiBridgeServer {
                 return
             }
 
+            configureClientSocket(clientFD)
+
             queue.async { [weak self] in
                 self?.handleConnection(clientFD)
             }
         }
+    }
+
+    private func configureClientSocket(_ clientFD: Int32) {
+        let flags = fcntl(clientFD, F_GETFL)
+        guard flags != -1 else {
+            return
+        }
+
+        _ = fcntl(clientFD, F_SETFL, flags & ~O_NONBLOCK)
     }
 
     private func handleConnection(_ clientFD: Int32) {
@@ -214,17 +225,37 @@ final class PiBridgeServer {
 
         var requestData = Data()
         var buffer = [UInt8](repeating: 0, count: 4096)
+        let deadline = Date().addingTimeInterval(1)
 
-        while true {
+        while Date() < deadline {
             let bytesRead = read(clientFD, &buffer, buffer.count)
             if bytesRead > 0 {
                 requestData.append(buffer, count: Int(bytesRead))
                 if requestData.contains(0x0A) {
                     break
                 }
-            } else {
+                continue
+            }
+
+            if bytesRead == 0 {
                 break
             }
+
+            if errno == EINTR {
+                continue
+            }
+
+            if errno == EAGAIN || errno == EWOULDBLOCK {
+                usleep(10_000)
+                continue
+            }
+
+            PiDebugLog.write("Bridge socket read failed errno=\(errno)")
+            break
+        }
+
+        if requestData.isEmpty {
+            PiDebugLog.write("Bridge connection closed without receiving request data")
         }
 
         guard let newlineIndex = requestData.firstIndex(of: 0x0A) else {
