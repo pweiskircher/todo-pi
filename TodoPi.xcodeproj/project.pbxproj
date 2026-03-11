@@ -29,11 +29,11 @@
 		A000003E /* PiLaunchConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000003F /* PiLaunchConfiguration.swift */; };
 		A0000044 /* PiBridgeServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000045 /* PiBridgeServer.swift */; };
 		A0000046 /* PiSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000047 /* PiSessionManager.swift */; };
-		A0000063 /* PiDebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000064 /* PiDebugLog.swift */; };
 		A0000048 /* PiRPCProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000049 /* PiRPCProtocolTests.swift */; };
 		A000004A /* PiBridgeServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000004B /* PiBridgeServerTests.swift */; };
-		A000004C /* todo-app-tools.ts in Resources */ = {isa = PBXBuildFile; fileRef = A000004D /* todo-app-tools.ts */; };
+		A000004C /* pi-extension/todo-app-tools.ts in Resources */ = {isa = PBXBuildFile; fileRef = A000004D /* pi-extension/todo-app-tools.ts */; };
 		A000004E /* PiLaunchConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000004F /* PiLaunchConfigurationTests.swift */; };
+		A0000063 /* PiDebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000064 /* PiDebugLog.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,7 +41,7 @@
 			isa = PBXContainerItemProxy;
 			containerPortal = A0000001 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = A0000040 /* TodoPi */;
+			remoteGlobalIDString = A0000040;
 			remoteInfo = TodoPi;
 		};
 /* End PBXContainerItemProxy section */
@@ -71,11 +71,11 @@
 		A000003F /* PiLaunchConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiLaunchConfiguration.swift; sourceTree = "<group>"; };
 		A0000045 /* PiBridgeServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiBridgeServer.swift; sourceTree = "<group>"; };
 		A0000047 /* PiSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiSessionManager.swift; sourceTree = "<group>"; };
-		A0000064 /* PiDebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiDebugLog.swift; sourceTree = "<group>"; };
 		A0000049 /* PiRPCProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiRPCProtocolTests.swift; sourceTree = "<group>"; };
 		A000004B /* PiBridgeServerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiBridgeServerTests.swift; sourceTree = "<group>"; };
-		A000004D /* todo-app-tools.ts */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "pi-extension/todo-app-tools.ts"; sourceTree = "<group>"; };
+		A000004D /* pi-extension/todo-app-tools.ts */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "pi-extension/todo-app-tools.ts"; sourceTree = "<group>"; };
 		A000004F /* PiLaunchConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiLaunchConfigurationTests.swift; sourceTree = "<group>"; };
+		A0000064 /* PiDebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiDebugLog.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -83,6 +83,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4379EB972F620D84005608F2 /* SplitView in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,7 +237,7 @@
 		A0000010A /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				A000004D /* todo-app-tools.ts */,
+				A000004D /* pi-extension/todo-app-tools.ts */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -267,6 +268,9 @@
 			dependencies = (
 			);
 			name = TodoPi;
+			packageProductDependencies = (
+				4379EB962F620D84005608F2 /* SplitView */,
+			);
 			productName = TodoPi;
 			productReference = A0000010 /* TodoPi.app */;
 			productType = "com.apple.product-type.application";
@@ -308,6 +312,9 @@
 				Base,
 			);
 			mainGroup = A0000002;
+			packageReferences = (
+				4379EB952F620D83005608F2 /* XCRemoteSwiftPackageReference "SplitView" */,
+			);
 			productRefGroup = A0000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -323,7 +330,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A000004C /* todo-app-tools.ts in Resources */,
+				A000004C /* pi-extension/todo-app-tools.ts in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -448,9 +455,9 @@
 		A0000052 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = TodoPi;
@@ -471,9 +478,9 @@
 		A0000053 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = TodoPi;
@@ -494,9 +501,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.1.0;
@@ -513,9 +520,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.1.0;
@@ -558,6 +565,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4379EB952F620D83005608F2 /* XCRemoteSwiftPackageReference "SplitView" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stevengharris/SplitView";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.5.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4379EB962F620D84005608F2 /* SplitView */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4379EB952F620D83005608F2 /* XCRemoteSwiftPackageReference "SplitView" */;
+			productName = SplitView;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A0000001 /* Project object */;
 }

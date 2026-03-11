@@ -1,33 +1,27 @@
+import AppKit
+import SplitView
 import SwiftUI
 
-private enum MainWindowPane: Hashable {
-    case sidebar
-    case chat
-}
-
-private enum MainWindowLayout {
-    static let sidebarMinWidth: CGFloat = 220
-    static let sidebarDefaultWidth: CGFloat = 260
-    static let listMinWidth: CGFloat = 340
-    static let chatMinWidth: CGFloat = 320
-    static let chatDefaultWidth: CGFloat = 320
-}
-
-private struct PaneWidthPreferenceKey: PreferenceKey {
-    static let defaultValue: [MainWindowPane: CGFloat] = [:]
-
-    static func reduce(value: inout [MainWindowPane: CGFloat], nextValue: () -> [MainWindowPane: CGFloat]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
-    }
-}
-
 struct MainWindowView: View {
+    private enum Layout {
+        static let sidebarMinWidth: CGFloat = 220
+        static let sidebarDefaultWidth: CGFloat = 260
+        static let listMinWidth: CGFloat = 340
+        static let chatMinWidth: CGFloat = 320
+        static let chatDefaultWidth: CGFloat = 320
+        static let dividerThickness: CGFloat = 1
+        static let defaultSidebarFraction: CGFloat = sidebarDefaultWidth / 1100
+        static let defaultContentFraction: CGFloat = (1100 - sidebarDefaultWidth - chatDefaultWidth) / (1100 - sidebarDefaultWidth)
+    }
+
     @StateObject private var viewModel: MainWindowViewModel
-    @AppStorage("mainWindow.sidebarWidth") private var storedSidebarWidth = MainWindowLayout.sidebarDefaultWidth
-    @AppStorage("mainWindow.chatWidth") private var storedChatWidth = MainWindowLayout.chatDefaultWidth
+    @StateObject private var sidebarFraction: FractionHolder
+    @StateObject private var contentFraction: FractionHolder
 
     init(viewModel: MainWindowViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        _sidebarFraction = StateObject(wrappedValue: FractionHolder.usingUserDefaults(Layout.defaultSidebarFraction, key: "mainWindow.sidebarFraction"))
+        _contentFraction = StateObject(wrappedValue: FractionHolder.usingUserDefaults(Layout.defaultContentFraction, key: "mainWindow.contentFraction"))
     }
 
     var body: some View {
@@ -41,70 +35,67 @@ struct MainWindowView: View {
                     .background(Color.orange.opacity(0.18))
             }
 
-            HSplitView {
-                TodoSidebarView(viewModel: viewModel)
-                    .frame(
-                        minWidth: MainWindowLayout.sidebarMinWidth,
-                        idealWidth: clampedSidebarWidth
-                    )
-                    .background(widthReader(for: .sidebar))
-
-                TodoListView(viewModel: viewModel)
-                    .frame(minWidth: MainWindowLayout.listMinWidth)
-
-                ChatPanelView(viewModel: viewModel.chatViewModel)
-                    .frame(
-                        minWidth: MainWindowLayout.chatMinWidth,
-                        idealWidth: clampedChatWidth
-                    )
-                    .background(widthReader(for: .chat))
-            }
-            .onPreferenceChange(PaneWidthPreferenceKey.self) { widths in
-                if let sidebarWidth = widths[.sidebar] {
-                    saveWidth(sidebarWidth, for: .sidebar)
-                }
-
-                if let chatWidth = widths[.chat] {
-                    saveWidth(chatWidth, for: .chat)
-                }
+            GeometryReader { proxy in
+                outerSplit(totalWidth: proxy.size.width)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(minWidth: 820, minHeight: 520)
     }
 
-    private var clampedSidebarWidth: CGFloat {
-        max(MainWindowLayout.sidebarMinWidth, storedSidebarWidth)
-    }
-
-    private var clampedChatWidth: CGFloat {
-        max(MainWindowLayout.chatMinWidth, storedChatWidth)
-    }
-
-    @ViewBuilder
-    private func widthReader(for pane: MainWindowPane) -> some View {
-        GeometryReader { proxy in
-            Color.clear
-                .preference(key: PaneWidthPreferenceKey.self, value: [pane: proxy.size.width])
+    private func outerSplit(totalWidth: CGFloat) -> some View {
+        HSplit(
+            left: {
+                TodoSidebarView(viewModel: viewModel)
+                    .frame(minWidth: Layout.sidebarMinWidth, maxWidth: .infinity, maxHeight: .infinity)
+            },
+            right: {
+                GeometryReader { proxy in
+                    innerSplit(availableWidth: proxy.size.width)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        )
+        .fraction(sidebarFraction)
+        .constraints(
+            minPFraction: fraction(for: Layout.sidebarMinWidth, in: totalWidth),
+            minSFraction: fraction(for: Layout.listMinWidth + Layout.chatMinWidth + Layout.dividerThickness, in: totalWidth),
+            priority: .left
+        )
+        .splitter {
+            Splitter.line(color: Color(nsColor: .separatorColor), visibleThickness: Layout.dividerThickness)
         }
     }
 
-    private func saveWidth(_ width: CGFloat, for pane: MainWindowPane) {
-        let clampedWidth: CGFloat
-        switch pane {
-        case .sidebar:
-            clampedWidth = max(MainWindowLayout.sidebarMinWidth, width)
-            guard abs(clampedWidth - storedSidebarWidth) > 1 else {
-                return
+    private func innerSplit(availableWidth: CGFloat) -> some View {
+        HSplit(
+            left: {
+                TodoListView(viewModel: viewModel)
+                    .frame(minWidth: Layout.listMinWidth, maxWidth: .infinity, maxHeight: .infinity)
+            },
+            right: {
+                ChatPanelView(viewModel: viewModel.chatViewModel)
+                    .frame(minWidth: Layout.chatMinWidth, maxWidth: .infinity, maxHeight: .infinity)
             }
-            storedSidebarWidth = clampedWidth
-
-        case .chat:
-            clampedWidth = max(MainWindowLayout.chatMinWidth, width)
-            guard abs(clampedWidth - storedChatWidth) > 1 else {
-                return
-            }
-            storedChatWidth = clampedWidth
+        )
+        .fraction(contentFraction)
+        .constraints(
+            minPFraction: fraction(for: Layout.listMinWidth, in: availableWidth),
+            minSFraction: fraction(for: Layout.chatMinWidth, in: availableWidth),
+            priority: .right
+        )
+        .splitter {
+            Splitter.line(color: Color(nsColor: .separatorColor), visibleThickness: Layout.dividerThickness)
         }
+    }
+
+    private func fraction(for minWidth: CGFloat, in totalWidth: CGFloat) -> CGFloat {
+        guard totalWidth > 0 else {
+            return 0.5
+        }
+
+        let clamped = min(max(minWidth / totalWidth, 0), 0.9)
+        return clamped
     }
 }
 
