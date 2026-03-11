@@ -15,7 +15,9 @@ final class MainWindowControllerTests: XCTestCase {
 
     private func makeViewModel() -> MainWindowViewModel {
         let store = TodoStore(document: .empty())
+        let repository = JSONTodoRepository(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("json"))
+        let commandService = TodoCommandService(store: store, repository: repository)
         let chatViewModel = ChatViewModel()
-        return MainWindowViewModel(store: store, chatViewModel: chatViewModel)
+        return MainWindowViewModel(store: store, commandService: commandService, chatViewModel: chatViewModel)
     }
 }

@@ -46,7 +46,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bridgeServer: bridgeServer
     )
     private lazy var chatViewModel = ChatViewModel(sessionManager: piSessionManager)
-    private lazy var mainWindowViewModel = MainWindowViewModel(store: store, chatViewModel: chatViewModel)
+    private lazy var mainWindowViewModel = MainWindowViewModel(
+        store: store,
+        commandService: commandService,
+        chatViewModel: chatViewModel
+    )
     private lazy var mainWindowController = MainWindowController(viewModel: mainWindowViewModel)
     private var menuBarController: MenuBarController?
 

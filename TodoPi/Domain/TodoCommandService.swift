@@ -66,6 +66,20 @@ final class TodoCommandService {
     }
 
     @discardableResult
+    func updateListTitle(listID: UUID, title: String) throws -> TodoList {
+        let normalizedTitle = try validateTitle(title)
+        let timestamp = now()
+
+        return try applyMutation { document in
+            let listIndex = try indexOfList(withID: listID, in: document)
+            document.lists[listIndex].title = normalizedTitle
+            document.lists[listIndex].updatedAt = timestamp
+            document.updatedAt = timestamp
+            return document.lists[listIndex]
+        }
+    }
+
+    @discardableResult
     func createTodo(
         in listID: UUID,
         title: String,
@@ -132,14 +146,23 @@ final class TodoCommandService {
         in listID: UUID,
         todoID: UUID
     ) throws -> TodoItem {
+        try setTodoCompletion(in: listID, todoID: todoID, isCompleted: true)
+    }
+
+    @discardableResult
+    func setTodoCompletion(
+        in listID: UUID,
+        todoID: UUID,
+        isCompleted: Bool
+    ) throws -> TodoItem {
         let timestamp = now()
 
         return try applyMutation { document in
             let listIndex = try indexOfList(withID: listID, in: document)
             let todoIndex = try indexOfTodo(withID: todoID, in: document.lists[listIndex])
 
-            document.lists[listIndex].todos[todoIndex].isCompleted = true
-            document.lists[listIndex].todos[todoIndex].completedAt = timestamp
+            document.lists[listIndex].todos[todoIndex].isCompleted = isCompleted
+            document.lists[listIndex].todos[todoIndex].completedAt = isCompleted ? timestamp : nil
             document.lists[listIndex].todos[todoIndex].updatedAt = timestamp
             document.lists[listIndex].updatedAt = timestamp
             document.updatedAt = timestamp

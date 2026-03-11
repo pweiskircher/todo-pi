@@ -54,6 +54,27 @@ final class TodoCommandServiceTests: XCTestCase {
         }
     }
 
+    func testUpdateListTitleAndToggleCompletionPersist() throws {
+        let tempDirectory = try makeTempDirectory()
+        let repository = JSONTodoRepository(fileURL: tempDirectory.appending(path: "todos.json"))
+        let store = TodoStore(document: .empty())
+        let service = TodoCommandService(store: store, repository: repository)
+
+        let list = try service.createList(title: "Inbox")
+        let todo = try service.createTodo(in: list.id, title: "Buy milk")
+
+        let renamedList = try service.updateListTitle(listID: list.id, title: "Personal")
+        let completedTodo = try service.setTodoCompletion(in: list.id, todoID: todo.id, isCompleted: true)
+        let reopenedTodo = try service.setTodoCompletion(in: list.id, todoID: todo.id, isCompleted: false)
+
+        XCTAssertEqual(renamedList.title, "Personal")
+        XCTAssertTrue(completedTodo.isCompleted)
+        XCTAssertNotNil(completedTodo.completedAt)
+        XCTAssertFalse(reopenedTodo.isCompleted)
+        XCTAssertNil(reopenedTodo.completedAt)
+        XCTAssertEqual(store.document.lists.first?.title, "Personal")
+    }
+
     func testCreateTodoRejectsUnknownList() {
         let service = makeService()
         let unknownListID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!

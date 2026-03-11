@@ -7,7 +7,7 @@ final class MainWindowViewModelTests: XCTestCase {
         let firstList = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox")
         let secondList = makeList(id: uuid("00000000-0000-0000-0000-000000000002"), title: "Today")
         let store = TodoStore(document: TodoDocument.empty().withLists([firstList, secondList]))
-        let viewModel = MainWindowViewModel(store: store, chatViewModel: ChatViewModel())
+        let viewModel = makeViewModel(store: store)
 
         viewModel.selectList(id: secondList.id)
         store.replace(with: TodoDocument.empty().withLists([
@@ -17,18 +17,64 @@ final class MainWindowViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.selectedListID, secondList.id)
         XCTAssertEqual(viewModel.selectedList?.title, "Today")
+        XCTAssertEqual(viewModel.selectedTodo?.title, "Buy milk")
     }
 
     func testSelectionFallsBackToFirstListWhenCurrentSelectionDisappears() {
         let firstList = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox")
         let secondList = makeList(id: uuid("00000000-0000-0000-0000-000000000002"), title: "Today")
         let store = TodoStore(document: TodoDocument.empty().withLists([firstList, secondList]))
-        let viewModel = MainWindowViewModel(store: store, chatViewModel: ChatViewModel())
+        let viewModel = makeViewModel(store: store)
 
         viewModel.selectList(id: secondList.id)
         store.replace(with: TodoDocument.empty().withLists([firstList]))
 
         XCTAssertEqual(viewModel.selectedListID, firstList.id)
+        XCTAssertNil(viewModel.selectedTodoID)
+    }
+
+    func testSaveListTitleAndTodoBodyMutateStore() throws {
+        let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
+        let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
+        let store = TodoStore(document: TodoDocument.empty().withLists([list]))
+        let viewModel = makeViewModel(store: store)
+
+        viewModel.listTitleDraft = "Personal"
+        viewModel.saveListTitle()
+
+        viewModel.todoBodyDraft = "Buy oat milk\n\n2 cartons from the corner store"
+        viewModel.saveTodoBody()
+
+        XCTAssertEqual(viewModel.selectedList?.title, "Personal")
+        XCTAssertEqual(viewModel.selectedTodo?.title, "Buy oat milk")
+        XCTAssertEqual(viewModel.selectedTodo?.notes, "2 cartons from the corner store")
+        XCTAssertNil(viewModel.editorErrorDescription)
+    }
+
+    func testToggleCompletionUpdatesSelectedTodo() {
+        let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
+        let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
+        let store = TodoStore(document: TodoDocument.empty().withLists([list]))
+        let viewModel = makeViewModel(store: store)
+
+        viewModel.toggleCompletion(for: todo.id)
+        XCTAssertEqual(viewModel.selectedTodo?.isCompleted, true)
+
+        viewModel.toggleCompletion(for: todo.id)
+        XCTAssertEqual(viewModel.selectedTodo?.isCompleted, false)
+    }
+
+    private func makeViewModel(store: TodoStore) -> MainWindowViewModel {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        let repository = JSONTodoRepository(fileURL: directory.appendingPathComponent("todos.json"))
+        let commandService = TodoCommandService(store: store, repository: repository)
+        return MainWindowViewModel(store: store, commandService: commandService, chatViewModel: ChatViewModel())
     }
 
     private func makeList(id: UUID, title: String) -> TodoList {

@@ -28,7 +28,7 @@ struct MainWindowView: View {
                 )
                 .frame(minWidth: 220, idealWidth: 260)
 
-                TodoListView(list: viewModel.selectedList)
+                TodoListView(viewModel: viewModel)
                     .frame(minWidth: 340)
 
                 ChatPanelView(viewModel: viewModel.chatViewModel)
@@ -84,7 +84,9 @@ struct MainWindowView: View {
         updatedAt: timestamp
     )
     let store = TodoStore(document: sampleDocument)
+    let repository = JSONTodoRepository(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("preview-todos.json"))
+    let commandService = TodoCommandService(store: store, repository: repository)
     let chatViewModel = ChatViewModel()
     chatViewModel.draftMessage = "Ask pi to clean up my inbox"
-    return MainWindowView(viewModel: MainWindowViewModel(store: store, chatViewModel: chatViewModel))
+    return MainWindowView(viewModel: MainWindowViewModel(store: store, commandService: commandService, chatViewModel: chatViewModel))
 }
