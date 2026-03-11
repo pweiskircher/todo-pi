@@ -17,7 +17,7 @@ final class MainWindowViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.selectedListID, secondList.id)
         XCTAssertEqual(viewModel.selectedList?.title, "Today")
-        XCTAssertEqual(viewModel.selectedTodo?.title, "Buy milk")
+        XCTAssertNil(viewModel.selectedTodo)
     }
 
     func testSelectionFallsBackToFirstListWhenCurrentSelectionDisappears() {
@@ -33,11 +33,26 @@ final class MainWindowViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.selectedTodoID)
     }
 
+    func testSelectingListDoesNotAutoSelectTodo() {
+        let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
+        let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
+        let store = TodoStore(document: TodoDocument.empty().withLists([list]))
+        let viewModel = makeViewModel(store: store)
+
+        XCTAssertEqual(viewModel.selectedListID, list.id)
+        XCTAssertNil(viewModel.selectedTodoID)
+
+        viewModel.selectList(id: list.id)
+
+        XCTAssertNil(viewModel.selectedTodoID)
+    }
+
     func testSaveListTitleAndTodoBodyMutateStore() throws {
         let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
         let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
         let store = TodoStore(document: TodoDocument.empty().withLists([list]))
         let viewModel = makeViewModel(store: store)
+        viewModel.selectTodo(id: todo.id)
 
         viewModel.listTitleDraft = "Personal"
         viewModel.saveListTitle()
@@ -56,6 +71,7 @@ final class MainWindowViewModelTests: XCTestCase {
         let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
         let store = TodoStore(document: TodoDocument.empty().withLists([list]))
         let viewModel = makeViewModel(store: store)
+        viewModel.selectTodo(id: todo.id)
 
         viewModel.toggleCompletion(for: todo.id)
         XCTAssertEqual(viewModel.selectedTodo?.isCompleted, true)
@@ -93,6 +109,7 @@ final class MainWindowViewModelTests: XCTestCase {
         let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([firstTodo, secondTodo])
         let store = TodoStore(document: TodoDocument.empty().withLists([list]))
         let viewModel = makeViewModel(store: store)
+        viewModel.selectTodo(id: firstTodo.id)
 
         viewModel.renameList(id: list.id, title: "Renamed Inbox")
         viewModel.renameTodoTitle(id: firstTodo.id, title: "Renamed First")
@@ -108,6 +125,7 @@ final class MainWindowViewModelTests: XCTestCase {
         let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
         let store = TodoStore(document: TodoDocument.empty().withLists([list]))
         let viewModel = makeViewModel(store: store)
+        viewModel.selectTodo(id: todo.id)
 
         viewModel.listTitleDraft = "Personal"
         viewModel.todoBodyDraft = "Buy oat milk\n\n2 cartons"

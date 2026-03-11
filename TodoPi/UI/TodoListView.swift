@@ -3,7 +3,8 @@ import SwiftUI
 struct TodoListView: View {
     private enum FocusedField: Hashable {
         case listTitle
-        case todoBody
+        case todoTitle
+        case todoNotes
     }
 
     @ObservedObject var viewModel: MainWindowViewModel
@@ -19,14 +20,17 @@ struct TodoListView: View {
                 VStack(spacing: 0) {
                     header(for: list)
 
+                    if let todo = viewModel.selectedTodo {
+                        Divider()
+
+                        todoDetailsCard(for: todo)
+                            .padding(16)
+                    }
+
                     Divider()
 
                     todoListSection(for: list)
-
-                    Divider()
-
-                    todoEditorSection
-                        .frame(height: 290)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
                 ContentUnavailableView(
@@ -42,7 +46,9 @@ struct TodoListView: View {
             if oldValue == .listTitle, newValue != .listTitle {
                 viewModel.saveListTitle()
             }
-            if oldValue == .todoBody, newValue != .todoBody {
+
+            if oldValue == .todoTitle || oldValue == .todoNotes,
+               newValue != .todoTitle && newValue != .todoNotes {
                 viewModel.saveTodoBody()
             }
         }
@@ -146,38 +152,95 @@ struct TodoListView: View {
         .padding(16)
     }
 
-    private var todoEditorSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let todo = viewModel.selectedTodo {
-                HStack {
-                    Text("Todo Details")
-                        .font(.headline)
-
-                    Spacer()
-
-                    if todo.isCompleted {
-                        Label("Completed", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .font(.subheadline)
-                    }
+    private func todoDetailsCard(for todo: TodoItem) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                if todo.isCompleted {
+                    Label("Completed", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.subheadline.weight(.medium))
+                } else {
+                    Label("Selected", systemImage: "circle.inset.filled")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline.weight(.medium))
                 }
 
-                TextEditor(text: $viewModel.todoBodyDraft)
-                    .font(.body)
-                    .focused($focusedField, equals: .todoBody)
-                    .padding(8)
-                    .background(Color.secondary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            } else {
-                ContentUnavailableView(
-                    "Select a todo",
-                    systemImage: "square.and.pencil",
-                    description: Text("Pick a todo above to edit its title and details.")
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Spacer()
             }
+
+            TextField("Todo title", text: todoTitleBinding)
+                .textFieldStyle(.plain)
+                .font(.title3.weight(.semibold))
+                .focused($focusedField, equals: .todoTitle)
+                .onSubmit {
+                    viewModel.saveTodoBody()
+                }
+
+            Divider()
+
+            TextEditor(text: todoNotesBinding)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .focused($focusedField, equals: .todoNotes)
+                .frame(minHeight: 150)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(nsColor: .textBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .padding(16)
+        .padding(18)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var todoTitleBinding: Binding<String> {
+        Binding(
+            get: { currentTodoDraft().title },
+            set: { updateTodoDraft(title: $0, notes: nil) }
+        )
+    }
+
+    private var todoNotesBinding: Binding<String> {
+        Binding(
+            get: { currentTodoDraft().notes },
+            set: { updateTodoDraft(title: nil, notes: $0) }
+        )
+    }
+
+    private func currentTodoDraft() -> (title: String, notes: String) {
+        let normalizedBody = viewModel.todoBodyDraft.replacingOccurrences(of: "\r\n", with: "\n")
+
+        if let separatorRange = normalizedBody.range(of: "\n\n") {
+            return (
+                title: String(normalizedBody[..<separatorRange.lowerBound]),
+                notes: String(normalizedBody[separatorRange.upperBound...])
+            )
+        }
+
+        if let newlineRange = normalizedBody.range(of: "\n") {
+            return (
+                title: String(normalizedBody[..<newlineRange.lowerBound]),
+                notes: String(normalizedBody[newlineRange.upperBound...])
+            )
+        }
+
+        return (title: normalizedBody, notes: "")
+    }
+
+    private func updateTodoDraft(title: String?, notes: String?) {
+        let currentDraft = currentTodoDraft()
+        let nextTitle = title ?? currentDraft.title
+        let nextNotes = notes ?? currentDraft.notes
+
+        if nextNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            viewModel.todoBodyDraft = nextTitle
+        } else {
+            viewModel.todoBodyDraft = "\(nextTitle)\n\n\(nextNotes)"
+        }
     }
 
     @ViewBuilder

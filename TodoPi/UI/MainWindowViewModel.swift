@@ -27,7 +27,7 @@ final class MainWindowViewModel: ObservableObject {
         self.commandService = commandService
         self.chatViewModel = chatViewModel
         self.selectedListID = store.document.lists.first?.id
-        self.selectedTodoID = store.document.lists.first?.todos.first?.id
+        self.selectedTodoID = nil
         syncEditorDrafts()
 
         store.objectWillChange
@@ -100,7 +100,7 @@ final class MainWindowViewModel: ObservableObject {
         }
 
         selectedListID = id
-        selectedTodoID = list.todos.first?.id
+        selectedTodoID = nil
         editorErrorDescription = nil
         syncEditorDrafts()
     }
@@ -307,7 +307,7 @@ final class MainWindowViewModel: ObservableObject {
             return
         }
 
-        self.selectedTodoID = list.todos.first?.id
+        self.selectedTodoID = nil
     }
 
     private func syncEditorDrafts() {
