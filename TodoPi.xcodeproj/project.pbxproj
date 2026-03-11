@@ -12,6 +12,12 @@
 		A0000022 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000014 /* MainWindowController.swift */; };
 		A0000023 /* MainWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000015 /* MainWindowView.swift */; };
 		A0000024 /* MainWindowControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000016 /* MainWindowControllerTests.swift */; };
+		A0000025 /* TodoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000017 /* TodoModels.swift */; };
+		A0000026 /* TodoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000018 /* TodoStore.swift */; };
+		A0000027 /* TodoCommandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000019 /* TodoCommandService.swift */; };
+		A0000028 /* JSONTodoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001A /* JSONTodoRepository.swift */; };
+		A0000029 /* TodoCommandServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001B /* TodoCommandServiceTests.swift */; };
+		A000002A /* JSONTodoRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001C /* JSONTodoRepositoryTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +38,12 @@
 		A0000014 /* MainWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
 		A0000015 /* MainWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowView.swift; sourceTree = "<group>"; };
 		A0000016 /* MainWindowControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowControllerTests.swift; sourceTree = "<group>"; };
+		A0000017 /* TodoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoModels.swift; sourceTree = "<group>"; };
+		A0000018 /* TodoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoStore.swift; sourceTree = "<group>"; };
+		A0000019 /* TodoCommandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoCommandService.swift; sourceTree = "<group>"; };
+		A000001A /* JSONTodoRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTodoRepository.swift; sourceTree = "<group>"; };
+		A000001B /* TodoCommandServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoCommandServiceTests.swift; sourceTree = "<group>"; };
+		A000001C /* JSONTodoRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTodoRepositoryTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +87,8 @@
 			children = (
 				A0000005 /* App */,
 				A0000007 /* UI */,
+				A0000008 /* Domain */,
+				A0000009 /* Persistence */,
 			);
 			path = TodoPi;
 			sourceTree = "<group>";
@@ -92,6 +106,8 @@
 		A0000006 /* TodoPiTests */ = {
 			isa = PBXGroup;
 			children = (
+				A000000A /* Domain */,
+				A000000B /* Persistence */,
 				A0000016 /* MainWindowControllerTests.swift */,
 			);
 			path = TodoPiTests;
@@ -103,6 +119,40 @@
 				A0000015 /* MainWindowView.swift */,
 			);
 			path = UI;
+			sourceTree = "<group>";
+		};
+		A0000008 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				A0000017 /* TodoModels.swift */,
+				A0000018 /* TodoStore.swift */,
+				A0000019 /* TodoCommandService.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		A0000009 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				A000001A /* JSONTodoRepository.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		A000000A /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				A000001B /* TodoCommandServiceTests.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		A000000B /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				A000001C /* JSONTodoRepositoryTests.swift */,
+			);
+			path = Persistence;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -198,6 +248,10 @@
 				A0000021 /* MenuBarController.swift in Sources */,
 				A0000022 /* MainWindowController.swift in Sources */,
 				A0000023 /* MainWindowView.swift in Sources */,
+				A0000025 /* TodoModels.swift in Sources */,
+				A0000026 /* TodoStore.swift in Sources */,
+				A0000027 /* TodoCommandService.swift in Sources */,
+				A0000028 /* JSONTodoRepository.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -206,6 +260,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0000024 /* MainWindowControllerTests.swift in Sources */,
+				A0000029 /* TodoCommandServiceTests.swift in Sources */,
+				A000002A /* JSONTodoRepositoryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
