@@ -4,6 +4,7 @@ import Foundation
 struct ChatMessage: Identifiable, Equatable {
     enum Role: String, Equatable {
         case user
+        case assistant
         case system
     }
 
@@ -27,13 +28,14 @@ final class ChatViewModel: ObservableObject {
     @Published private(set) var messages: [ChatMessage] = []
     @Published private(set) var status: Status = .offline
 
-    private let sessionManager: PiSessionManager?
+    private let sessionManager: PiSessionManaging?
     private let now: () -> Date
     private let makeID: () -> UUID
+    private var activeAssistantMessageID: UUID?
     private var cancellables: Set<AnyCancellable> = []
 
     init(
-        sessionManager: PiSessionManager? = nil,
+        sessionManager: PiSessionManaging? = nil,
         now: @escaping () -> Date = Date.init,
         makeID: @escaping () -> UUID = UUID.init
     ) {
@@ -41,9 +43,15 @@ final class ChatViewModel: ObservableObject {
         self.now = now
         self.makeID = makeID
 
-        sessionManager?.$state
+        sessionManager?.statePublisher
             .sink { [weak self] state in
                 self?.status = Self.mapStatus(from: state)
+            }
+            .store(in: &cancellables)
+
+        sessionManager?.eventPublisher
+            .sink { [weak self] event in
+                self?.handleSessionEvent(event)
             }
             .store(in: &cancellables)
     }
@@ -64,11 +72,54 @@ final class ChatViewModel: ObservableObject {
 
         Task {
             do {
-                try await sessionManager.startIfNeeded()
-                appendMessage(role: .system, text: "pi is connected. Prompt delivery comes in the next phase.")
+                try await sessionManager.sendPrompt(message)
             } catch {
+                activeAssistantMessageID = nil
                 appendMessage(role: .system, text: error.localizedDescription)
             }
+        }
+    }
+
+    private func handleSessionEvent(_ event: PiSessionEvent) {
+        switch event {
+        case let .assistantMessageChanged(text):
+            upsertAssistantMessage(text: text, isComplete: false)
+        case let .assistantMessageCompleted(text):
+            upsertAssistantMessage(text: text, isComplete: true)
+        case let .systemNotice(text):
+            activeAssistantMessageID = nil
+            appendMessage(role: .system, text: text)
+        }
+    }
+
+    private func upsertAssistantMessage(text: String, isComplete: Bool) {
+        guard !text.isEmpty else {
+            return
+        }
+
+        if let activeAssistantMessageID,
+           let index = messages.firstIndex(where: { $0.id == activeAssistantMessageID }) {
+            messages[index] = ChatMessage(
+                id: activeAssistantMessageID,
+                role: .assistant,
+                text: text,
+                createdAt: messages[index].createdAt
+            )
+        } else {
+            let messageID = makeID()
+            messages.append(
+                ChatMessage(
+                    id: messageID,
+                    role: .assistant,
+                    text: text,
+                    createdAt: now()
+                )
+            )
+            activeAssistantMessageID = messageID
+        }
+
+        if isComplete {
+            activeAssistantMessageID = nil
         }
     }
 

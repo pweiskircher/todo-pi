@@ -107,13 +107,29 @@ struct PiRPCResponse: Equatable {
     let data: JSONValue?
 }
 
+enum PiAssistantMessageEvent: Equatable {
+    case start
+    case textStart
+    case textDelta(String)
+    case textEnd(String?)
+    case thinkingStart
+    case thinkingDelta(String)
+    case thinkingEnd(String?)
+    case toolCallStart(String?)
+    case toolCallDelta(String)
+    case toolCallEnd(String?)
+    case done(String?)
+    case error(String?)
+}
+
 enum PiRPCEvent: Equatable {
     case agentStart
     case agentEnd
     case turnStart
-    case turnEnd
-    case messageStart
-    case messageEnd
+    case turnEnd(role: String?, text: String?)
+    case messageStart(role: String?)
+    case messageUpdate(PiAssistantMessageEvent)
+    case messageEnd(role: String?, text: String?)
     case toolExecutionStart(String)
     case toolExecutionEnd(String, isError: Bool)
     case extensionError(String)
@@ -219,11 +235,17 @@ enum PiRPCProtocol {
         case "turn_start":
             return .event(.turnStart)
         case "turn_end":
-            return .event(.turnEnd)
+            return .event(.turnEnd(role: extractMessageRole(from: object["message"]), text: extractMessageText(from: object["message"])))
         case "message_start":
-            return .event(.messageStart)
+            return .event(.messageStart(role: extractMessageRole(from: object["message"])))
+        case "message_update":
+            guard let assistantMessageEvent = object["assistantMessageEvent"] as? [String: Any],
+                  let eventType = assistantMessageEvent["type"] as? String else {
+                return .event(.unknown("message_update"))
+            }
+            return .event(.messageUpdate(parseAssistantMessageEvent(type: eventType, payload: assistantMessageEvent)))
         case "message_end":
-            return .event(.messageEnd)
+            return .event(.messageEnd(role: extractMessageRole(from: object["message"]), text: extractMessageText(from: object["message"])))
         case "tool_execution_start":
             return .event(.toolExecutionStart(object["toolName"] as? String ?? "unknown"))
         case "tool_execution_end":
@@ -233,5 +255,65 @@ enum PiRPCProtocol {
         default:
             return .event(.unknown(type))
         }
+    }
+
+    private static func parseAssistantMessageEvent(type: String, payload: [String: Any]) -> PiAssistantMessageEvent {
+        switch type {
+        case "start":
+            return .start
+        case "text_start":
+            return .textStart
+        case "text_delta":
+            return .textDelta(payload["delta"] as? String ?? "")
+        case "text_end":
+            return .textEnd(payload["content"] as? String)
+        case "thinking_start":
+            return .thinkingStart
+        case "thinking_delta":
+            return .thinkingDelta(payload["delta"] as? String ?? "")
+        case "thinking_end":
+            return .thinkingEnd(payload["content"] as? String)
+        case "toolcall_start":
+            let toolName = (payload["partial"] as? [String: Any])?["name"] as? String
+            return .toolCallStart(toolName)
+        case "toolcall_delta":
+            return .toolCallDelta(payload["delta"] as? String ?? "")
+        case "toolcall_end":
+            let toolName = (payload["toolCall"] as? [String: Any])?["name"] as? String
+            return .toolCallEnd(toolName)
+        case "done":
+            return .done(payload["reason"] as? String)
+        case "error":
+            return .error(payload["reason"] as? String ?? payload["error"] as? String)
+        default:
+            return .error(type)
+        }
+    }
+
+    private static func extractMessageRole(from value: Any?) -> String? {
+        (value as? [String: Any])?["role"] as? String
+    }
+
+    private static func extractMessageText(from value: Any?) -> String? {
+        guard let message = value as? [String: Any], let content = message["content"] else {
+            return nil
+        }
+
+        if let content = content as? String {
+            return content
+        }
+
+        guard let blocks = content as? [[String: Any]] else {
+            return nil
+        }
+
+        let text = blocks.compactMap { block -> String? in
+            guard let type = block["type"] as? String, type == "text" else {
+                return nil
+            }
+            return block["text"] as? String
+        }.joined()
+
+        return text.isEmpty ? nil : text
     }
 }

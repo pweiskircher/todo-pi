@@ -1,8 +1,23 @@
 import Combine
 import Foundation
 
+enum PiSessionEvent: Equatable {
+    case assistantMessageChanged(String)
+    case assistantMessageCompleted(String)
+    case systemNotice(String)
+}
+
 @MainActor
-final class PiSessionManager: ObservableObject {
+protocol PiSessionManaging: AnyObject {
+    var statePublisher: AnyPublisher<PiSessionManager.State, Never> { get }
+    var eventPublisher: AnyPublisher<PiSessionEvent, Never> { get }
+
+    func startIfNeeded() async throws
+    func sendPrompt(_ message: String) async throws
+}
+
+@MainActor
+final class PiSessionManager: ObservableObject, PiSessionManaging {
     enum State: Equatable {
         case idle
         case starting
@@ -14,8 +29,17 @@ final class PiSessionManager: ObservableObject {
 
     @Published private(set) var state: State = .idle
 
+    var statePublisher: AnyPublisher<State, Never> {
+        $state.eraseToAnyPublisher()
+    }
+
+    var eventPublisher: AnyPublisher<PiSessionEvent, Never> {
+        eventSubject.eraseToAnyPublisher()
+    }
+
     private let launchConfiguration: PiLaunchConfiguration?
     private let bridgeServer: PiBridgeServer
+    private let eventSubject = PassthroughSubject<PiSessionEvent, Never>()
 
     private var process: Process?
     private var stdinHandle: FileHandle?
@@ -23,6 +47,7 @@ final class PiSessionManager: ObservableObject {
     private var pendingResponses: [String: (Result<PiRPCResponse, Error>) -> Void] = [:]
     private var startupTask: Task<Void, Error>?
     private var stderrText = ""
+    private var streamedAssistantText = ""
 
     init(
         launchConfiguration: PiLaunchConfiguration?,
@@ -62,7 +87,11 @@ final class PiSessionManager: ObservableObject {
     func sendPrompt(_ message: String) async throws {
         try await startIfNeeded()
         let commandID = UUID().uuidString
-        _ = try await sendCommandAndAwaitResponse(PiRPCCommand.prompt(id: commandID, message: message), id: commandID)
+        let response = try await sendCommandAndAwaitResponse(PiRPCCommand.prompt(id: commandID, message: message), id: commandID)
+        guard response.success else {
+            let errorMessage = response.error ?? "prompt failed"
+            throw NSError(domain: "TodoPi.PiSessionManager", code: 6, userInfo: [NSLocalizedDescriptionKey: errorMessage])
+        }
     }
 
     func stop() {
@@ -71,6 +100,7 @@ final class PiSessionManager: ObservableObject {
         stdinHandle = nil
         bridgeServer.stop()
         failPendingResponses(with: CancellationError())
+        streamedAssistantText = ""
         state = .stopped
     }
 
@@ -83,6 +113,7 @@ final class PiSessionManager: ObservableObject {
         state = .starting
         stderrText = ""
         stdoutFramer = PiJSONLFramer()
+        streamedAssistantText = ""
 
         if let validationError = launchConfiguration.validationError {
             state = .failed(validationError)
@@ -214,12 +245,71 @@ final class PiSessionManager: ObservableObject {
                 state = .busy
             case .agentEnd:
                 state = .ready
+            case .turnStart:
+                break
+            case let .turnEnd(role, text):
+                if role == "assistant" {
+                    finalizeAssistantMessage(fallbackText: text)
+                }
+            case .messageStart:
+                break
+            case let .messageUpdate(update):
+                handleAssistantMessageUpdate(update)
+            case let .messageEnd(role, text):
+                if role == "assistant" {
+                    finalizeAssistantMessage(fallbackText: text)
+                }
+            case .toolExecutionStart, .toolExecutionEnd:
+                break
             case let .extensionError(error):
+                eventSubject.send(.systemNotice(error))
                 state = .failed(error)
-            case .turnStart, .turnEnd, .messageStart, .messageEnd, .toolExecutionStart, .toolExecutionEnd, .unknown:
+            case .unknown:
                 break
             }
         }
+    }
+
+    private func handleAssistantMessageUpdate(_ event: PiAssistantMessageEvent) {
+        switch event {
+        case .start:
+            streamedAssistantText = ""
+        case let .textDelta(delta):
+            streamedAssistantText += delta
+            eventSubject.send(.assistantMessageChanged(streamedAssistantText))
+        case let .textEnd(content):
+            if streamedAssistantText.isEmpty, let content, !content.isEmpty {
+                streamedAssistantText = content
+                eventSubject.send(.assistantMessageChanged(content))
+            }
+        case let .done(reason):
+            if reason == "error" || reason == "aborted" {
+                finalizeAssistantMessage(fallbackText: streamedAssistantText)
+            }
+        case let .error(reason):
+            if let reason, !reason.isEmpty {
+                eventSubject.send(.systemNotice("Assistant stream failed: \(reason)"))
+            }
+            finalizeAssistantMessage(fallbackText: streamedAssistantText)
+        case .textStart, .thinkingStart, .thinkingDelta, .thinkingEnd, .toolCallStart, .toolCallDelta, .toolCallEnd:
+            break
+        }
+    }
+
+    private func finalizeAssistantMessage(fallbackText: String?) {
+        let finalText: String?
+        if !streamedAssistantText.isEmpty {
+            finalText = streamedAssistantText
+        } else {
+            let trimmedFallback = fallbackText?.trimmingCharacters(in: .whitespacesAndNewlines)
+            finalText = (trimmedFallback?.isEmpty == false) ? trimmedFallback : nil
+        }
+
+        if let finalText {
+            eventSubject.send(.assistantMessageCompleted(finalText))
+        }
+
+        streamedAssistantText = ""
     }
 
     private func handleTermination(_ process: Process) {
@@ -234,10 +324,13 @@ final class PiSessionManager: ObservableObject {
             statusMessage = "pi exited with status \(process.terminationStatus)"
         }
 
+        streamedAssistantText = ""
+
         if process.terminationReason == .exit && process.terminationStatus == 0 {
             state = .stopped
             failPendingResponses(with: CancellationError())
         } else {
+            eventSubject.send(.systemNotice(statusMessage))
             state = .failed(statusMessage)
             let error = NSError(domain: "TodoPi.PiSessionManager", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: statusMessage])
             failPendingResponses(with: error)

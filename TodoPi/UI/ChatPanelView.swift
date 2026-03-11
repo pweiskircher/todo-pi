@@ -44,7 +44,7 @@ struct ChatPanelView: View {
                 } else {
                     ForEach(viewModel.messages) { message in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(message.role == .user ? "You" : "TodoPi")
+                            Text(authorLabel(for: message.role))
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
@@ -53,7 +53,7 @@ struct ChatPanelView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(12)
-                        .background(message.role == .user ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.12))
+                        .background(backgroundColor(for: message.role))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
@@ -70,6 +70,28 @@ struct ChatPanelView: View {
             .padding(.vertical, 6)
             .background(statusBackgroundColor)
             .clipShape(Capsule())
+    }
+
+    private func authorLabel(for role: ChatMessage.Role) -> String {
+        switch role {
+        case .user:
+            return "You"
+        case .assistant:
+            return "TodoPi"
+        case .system:
+            return "System"
+        }
+    }
+
+    private func backgroundColor(for role: ChatMessage.Role) -> Color {
+        switch role {
+        case .user:
+            return Color.accentColor.opacity(0.12)
+        case .assistant:
+            return Color.secondary.opacity(0.12)
+        case .system:
+            return Color.red.opacity(0.12)
+        }
     }
 
     private var statusText: String {
