@@ -1,8 +1,30 @@
-import AppKit
 import SwiftUI
+
+private enum MainWindowPane: Hashable {
+    case sidebar
+    case chat
+}
+
+private enum MainWindowLayout {
+    static let sidebarMinWidth: CGFloat = 220
+    static let sidebarDefaultWidth: CGFloat = 260
+    static let listMinWidth: CGFloat = 340
+    static let chatMinWidth: CGFloat = 320
+    static let chatDefaultWidth: CGFloat = 320
+}
+
+private struct PaneWidthPreferenceKey: PreferenceKey {
+    static let defaultValue: [MainWindowPane: CGFloat] = [:]
+
+    static func reduce(value: inout [MainWindowPane: CGFloat], nextValue: () -> [MainWindowPane: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
 
 struct MainWindowView: View {
     @StateObject private var viewModel: MainWindowViewModel
+    @AppStorage("mainWindow.sidebarWidth") private var storedSidebarWidth = MainWindowLayout.sidebarDefaultWidth
+    @AppStorage("mainWindow.chatWidth") private var storedChatWidth = MainWindowLayout.chatDefaultWidth
 
     init(viewModel: MainWindowViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -19,69 +41,70 @@ struct MainWindowView: View {
                     .background(Color.orange.opacity(0.18))
             }
 
-            MainWindowSplitView(viewModel: viewModel)
+            HSplitView {
+                TodoSidebarView(viewModel: viewModel)
+                    .frame(
+                        minWidth: MainWindowLayout.sidebarMinWidth,
+                        idealWidth: clampedSidebarWidth
+                    )
+                    .background(widthReader(for: .sidebar))
+
+                TodoListView(viewModel: viewModel)
+                    .frame(minWidth: MainWindowLayout.listMinWidth)
+
+                ChatPanelView(viewModel: viewModel.chatViewModel)
+                    .frame(
+                        minWidth: MainWindowLayout.chatMinWidth,
+                        idealWidth: clampedChatWidth
+                    )
+                    .background(widthReader(for: .chat))
+            }
+            .onPreferenceChange(PaneWidthPreferenceKey.self) { widths in
+                if let sidebarWidth = widths[.sidebar] {
+                    saveWidth(sidebarWidth, for: .sidebar)
+                }
+
+                if let chatWidth = widths[.chat] {
+                    saveWidth(chatWidth, for: .chat)
+                }
+            }
         }
         .frame(minWidth: 820, minHeight: 520)
     }
-}
 
-private struct MainWindowSplitView: NSViewControllerRepresentable {
-    let viewModel: MainWindowViewModel
-
-    func makeNSViewController(context: Context) -> MainWindowSplitViewController {
-        MainWindowSplitViewController(viewModel: viewModel)
+    private var clampedSidebarWidth: CGFloat {
+        max(MainWindowLayout.sidebarMinWidth, storedSidebarWidth)
     }
 
-    func updateNSViewController(_ nsViewController: MainWindowSplitViewController, context: Context) {
-        nsViewController.update(viewModel: viewModel)
-    }
-}
-
-@MainActor
-private final class MainWindowSplitViewController: NSSplitViewController {
-    private let sidebarController = NSHostingController(rootView: AnyView(EmptyView()))
-    private let listController = NSHostingController(rootView: AnyView(EmptyView()))
-    private let chatController = NSHostingController(rootView: AnyView(EmptyView()))
-
-    init(viewModel: MainWindowViewModel) {
-        super.init(nibName: nil, bundle: nil)
-        configureSplitItems()
-        update(viewModel: viewModel)
+    private var clampedChatWidth: CGFloat {
+        max(MainWindowLayout.chatMinWidth, storedChatWidth)
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+    @ViewBuilder
+    private func widthReader(for pane: MainWindowPane) -> some View {
+        GeometryReader { proxy in
+            Color.clear
+                .preference(key: PaneWidthPreferenceKey.self, value: [pane: proxy.size.width])
+        }
     }
 
-    func update(viewModel: MainWindowViewModel) {
-        sidebarController.rootView = AnyView(TodoSidebarView(viewModel: viewModel))
-        listController.rootView = AnyView(TodoListView(viewModel: viewModel))
-        chatController.rootView = AnyView(ChatPanelView(viewModel: viewModel.chatViewModel))
-    }
+    private func saveWidth(_ width: CGFloat, for pane: MainWindowPane) {
+        let clampedWidth: CGFloat
+        switch pane {
+        case .sidebar:
+            clampedWidth = max(MainWindowLayout.sidebarMinWidth, width)
+            guard abs(clampedWidth - storedSidebarWidth) > 1 else {
+                return
+            }
+            storedSidebarWidth = clampedWidth
 
-    private func configureSplitItems() {
-        splitView.autosaveName = NSSplitView.AutosaveName("TodoPiMainWindowSplitView")
-        splitView.dividerStyle = .thin
-
-        let sidebarItem = NSSplitViewItem(viewController: sidebarController)
-        sidebarItem.minimumThickness = 220
-        sidebarItem.canCollapse = false
-        sidebarItem.holdingPriority = .defaultHigh
-
-        let listItem = NSSplitViewItem(viewController: listController)
-        listItem.minimumThickness = 340
-        listItem.canCollapse = false
-        listItem.holdingPriority = .defaultLow
-
-        let chatItem = NSSplitViewItem(viewController: chatController)
-        chatItem.minimumThickness = 320
-        chatItem.canCollapse = false
-        chatItem.holdingPriority = .defaultHigh
-
-        addSplitViewItem(sidebarItem)
-        addSplitViewItem(listItem)
-        addSplitViewItem(chatItem)
+        case .chat:
+            clampedWidth = max(MainWindowLayout.chatMinWidth, width)
+            guard abs(clampedWidth - storedChatWidth) > 1 else {
+                return
+            }
+            storedChatWidth = clampedWidth
+        }
     }
 }
 
