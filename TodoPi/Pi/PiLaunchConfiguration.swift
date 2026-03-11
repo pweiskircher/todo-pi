@@ -86,6 +86,16 @@ struct PiLaunchConfiguration {
         return nil
     }
 
+    static func defaultWorkingDirectoryURL(
+        fileManager: FileManager = .default,
+        applicationSupportURL: URL? = nil
+    ) -> URL {
+        let baseURL = applicationSupportURL ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return baseURL
+            .appendingPathComponent("TodoPi", isDirectory: true)
+            .appendingPathComponent("pi-runtime", isDirectory: true)
+    }
+
     private static func resolveExecutableURL(
         command: String,
         environment: [String: String],

@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private lazy var socketURL = FileManager.default.temporaryDirectory
         .appendingPathComponent("todopi-\(UUID().uuidString).sock", isDirectory: false)
+    private lazy var piWorkingDirectoryURL = PiLaunchConfiguration.defaultWorkingDirectoryURL()
     private lazy var bridgeToken = UUID().uuidString
     private lazy var bridgeServer = PiBridgeServer(
         socketURL: socketURL,
@@ -32,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // so long-term we should let users point TodoPi at their preferred pi binary.
     private lazy var launchConfiguration = PiLaunchConfiguration.defaultExtensionURL().map {
         PiLaunchConfiguration(
-            workingDirectoryURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+            workingDirectoryURL: piWorkingDirectoryURL,
             extensionURL: $0,
             socketURL: socketURL,
             authToken: bridgeToken
@@ -49,6 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+
+        do {
+            try FileManager.default.createDirectory(at: piWorkingDirectoryURL, withIntermediateDirectories: true)
+        } catch {
+            NSLog("Failed to create pi working directory: \(error.localizedDescription)")
+        }
 
         do {
             try commandService.load()

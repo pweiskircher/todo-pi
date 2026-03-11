@@ -2,6 +2,26 @@ import XCTest
 @testable import TodoPi
 
 final class PiLaunchConfigurationTests: XCTestCase {
+    func testDefaultWorkingDirectoryURLUsesApplicationSupportSubdirectory() throws {
+        let fileManager = FileManager.default
+        let rootURL = try makeTemporaryDirectory()
+        defer { try? fileManager.removeItem(at: rootURL) }
+
+        let applicationSupportURL = rootURL.appendingPathComponent("Application Support", isDirectory: true)
+        let workingDirectoryURL = PiLaunchConfiguration.defaultWorkingDirectoryURL(
+            fileManager: fileManager,
+            applicationSupportURL: applicationSupportURL
+        )
+
+        XCTAssertEqual(
+            workingDirectoryURL.path,
+            applicationSupportURL
+                .appendingPathComponent("TodoPi", isDirectory: true)
+                .appendingPathComponent("pi-runtime", isDirectory: true)
+                .path
+        )
+    }
+
     func testInitializerResolvesPiFromPATH() throws {
         let fileManager = FileManager.default
         let rootURL = try makeTemporaryDirectory()
