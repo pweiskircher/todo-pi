@@ -18,6 +18,22 @@ final class PiBridgeServerTests: XCTestCase {
         XCTAssertEqual(response, .failure(code: "unauthorized", message: "invalid auth token"))
     }
 
+    func testMissingArgumentsFieldDefaultsToEmptyDictionary() throws {
+        let server = PiBridgeServer(
+            socketURL: tempSocketURL(),
+            authToken: "secret"
+        ) { request in
+            XCTAssertEqual(request.tool, "getLists")
+            XCTAssertEqual(request.arguments, [:])
+            return .success(.array([]))
+        }
+
+        let requestData = Data("{\"token\":\"secret\",\"tool\":\"getLists\"}".utf8)
+        let response = try decode(server.processRequestData(requestData))
+
+        XCTAssertEqual(response, .success(.array([])))
+    }
+
     func testProcessRequestDataReturnsUnsupportedToolFailure() throws {
         let timestamp = Date(timeIntervalSince1970: 1_731_000_000)
         let store = TodoStore(document: .empty(now: timestamp))

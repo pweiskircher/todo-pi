@@ -5,6 +5,25 @@ struct PiBridgeRequest: Codable, Equatable {
     let token: String
     let tool: String
     let arguments: [String: JSONValue]
+
+    private enum CodingKeys: String, CodingKey {
+        case token
+        case tool
+        case arguments
+    }
+
+    init(token: String, tool: String, arguments: [String: JSONValue]) {
+        self.token = token
+        self.tool = tool
+        self.arguments = arguments
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        token = try container.decode(String.self, forKey: .token)
+        tool = try container.decode(String.self, forKey: .tool)
+        arguments = try container.decodeIfPresent([String: JSONValue].self, forKey: .arguments) ?? [:]
+    }
 }
 
 struct PiBridgeResponse: Codable, Equatable {

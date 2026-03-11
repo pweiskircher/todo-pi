@@ -19,7 +19,7 @@ function getBridgeConfig() {
   return { socketPath, token };
 }
 
-async function callBridge(tool: string, args: Record<string, unknown>): Promise<BridgeResponse> {
+async function callBridge(tool: string, args: Record<string, unknown> = {}): Promise<BridgeResponse> {
   const { socketPath, token } = getBridgeConfig();
   const payload = JSON.stringify({ token, tool, arguments: args }) + "\n";
 
@@ -76,7 +76,7 @@ function registerBridgeTool(pi: ExtensionAPI, options: {
     description: options.description,
     parameters: options.parameters,
     async execute(_toolCallId, params) {
-      const response = await callBridge(options.name, params as Record<string, unknown>);
+      const response = await callBridge(options.name, (params ?? {}) as Record<string, unknown>);
       if (!response.isSuccess) {
         throw new Error(`${response.errorCode ?? "bridge_error"}: ${response.message ?? "request failed"}`);
       }
