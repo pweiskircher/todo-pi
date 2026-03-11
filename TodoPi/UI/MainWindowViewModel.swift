@@ -15,8 +15,12 @@ final class MainWindowViewModel: ObservableObject {
     private let commandService: TodoCommandService
     private var cancellables: Set<AnyCancellable> = []
     private var isSyncingDrafts = false
+    private var isListTitleDirty = false
+    private var isTodoBodyDirty = false
     private var lastDraftedListID: UUID?
     private var lastDraftedTodoID: UUID?
+    private var listTitleDraftBaseUpdatedAt: Date?
+    private var todoBodyDraftBaseUpdatedAt: Date?
 
     init(
         store: TodoStore,
@@ -28,7 +32,7 @@ final class MainWindowViewModel: ObservableObject {
         self.chatViewModel = chatViewModel
         self.selectedListID = store.document.lists.first?.id
         self.selectedTodoID = nil
-        syncEditorDrafts()
+        syncEditorDrafts(with: store.document.lists)
 
         store.objectWillChange
             .sink { [weak self] _ in
@@ -37,16 +41,21 @@ final class MainWindowViewModel: ObservableObject {
             .store(in: &cancellables)
 
         store.$document
-            .map(\.lists)
-            .sink { [weak self] lists in
-                self?.syncSelection(with: lists)
-                self?.syncEditorDrafts()
+            .sink { [weak self] document in
+                self?.syncSelection(with: document.lists)
+                self?.syncEditorDrafts(with: document.lists)
             }
             .store(in: &cancellables)
 
         $listTitleDraft
             .dropFirst()
             .removeDuplicates()
+            .handleEvents(receiveOutput: { [weak self] _ in
+                guard let self, !self.isSyncingDrafts else {
+                    return
+                }
+                self.isListTitleDirty = true
+            })
             .debounce(for: .milliseconds(250), scheduler: RunLoop.main)
             .sink { [weak self] _ in
                 self?.autosaveListTitleIfNeeded()
@@ -56,6 +65,12 @@ final class MainWindowViewModel: ObservableObject {
         $todoBodyDraft
             .dropFirst()
             .removeDuplicates()
+            .handleEvents(receiveOutput: { [weak self] _ in
+                guard let self, !self.isSyncingDrafts else {
+                    return
+                }
+                self.isTodoBodyDirty = true
+            })
             .debounce(for: .milliseconds(250), scheduler: RunLoop.main)
             .sink { [weak self] _ in
                 self?.autosaveTodoBodyIfNeeded()
@@ -91,7 +106,7 @@ final class MainWindowViewModel: ObservableObject {
         guard let id else {
             selectedListID = nil
             selectedTodoID = nil
-            syncEditorDrafts()
+            syncEditorDrafts(with: store.document.lists)
             return
         }
 
@@ -102,7 +117,7 @@ final class MainWindowViewModel: ObservableObject {
         selectedListID = id
         selectedTodoID = nil
         editorErrorDescription = nil
-        syncEditorDrafts()
+        syncEditorDrafts(with: store.document.lists)
     }
 
     func selectTodo(id: UUID?) {
@@ -110,7 +125,7 @@ final class MainWindowViewModel: ObservableObject {
 
         guard let id else {
             selectedTodoID = nil
-            syncEditorDrafts()
+            syncEditorDrafts(with: store.document.lists)
             return
         }
 
@@ -120,7 +135,7 @@ final class MainWindowViewModel: ObservableObject {
 
         selectedTodoID = id
         editorErrorDescription = nil
-        syncEditorDrafts()
+        syncEditorDrafts(with: store.document.lists)
     }
 
     func createList() {
@@ -131,7 +146,7 @@ final class MainWindowViewModel: ObservableObject {
             selectedListID = list.id
             selectedTodoID = nil
             editorErrorDescription = nil
-            syncEditorDrafts()
+            syncEditorDrafts(with: store.document.lists)
         } catch {
             editorErrorDescription = error.localizedDescription
         }
@@ -160,7 +175,7 @@ final class MainWindowViewModel: ObservableObject {
             )
             selectedTodoID = todo.id
             editorErrorDescription = nil
-            syncEditorDrafts()
+            syncEditorDrafts(with: store.document.lists)
         } catch {
             editorErrorDescription = error.localizedDescription
         }
@@ -184,12 +199,33 @@ final class MainWindowViewModel: ObservableObject {
             return
         }
 
-        let normalizedDraft = listTitleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedDraft.isEmpty, normalizedDraft != list.title else {
+        if isListTitleDirty,
+           let baseUpdatedAt = listTitleDraftBaseUpdatedAt,
+           list.updatedAt != baseUpdatedAt {
+            editorErrorDescription = "This list changed while you were editing. Your draft was not saved."
             return
         }
 
-        renameList(id: list.id, title: listTitleDraft)
+        let normalizedDraft = listTitleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedDraft.isEmpty else {
+            return
+        }
+
+        guard normalizedDraft != list.title else {
+            isListTitleDirty = false
+            listTitleDraftBaseUpdatedAt = list.updatedAt
+            return
+        }
+
+        do {
+            let updatedList = try commandService.updateListTitle(listID: list.id, title: listTitleDraft)
+            listTitleDraft = updatedList.title
+            listTitleDraftBaseUpdatedAt = updatedList.updatedAt
+            isListTitleDirty = false
+            editorErrorDescription = nil
+        } catch {
+            editorErrorDescription = error.localizedDescription
+        }
     }
 
     func renameList(id: UUID, title: String) {
@@ -206,15 +242,27 @@ final class MainWindowViewModel: ObservableObject {
             return
         }
 
+        if isTodoBodyDirty,
+           let baseUpdatedAt = todoBodyDraftBaseUpdatedAt,
+           todo.updatedAt != baseUpdatedAt {
+            editorErrorDescription = "This todo changed while you were editing. Your draft was not saved."
+            return
+        }
+
         let normalizedDraft = todoBodyDraft.replacingOccurrences(of: "\r\n", with: "\n")
         let currentBody = Self.todoBodyText(from: todo).replacingOccurrences(of: "\r\n", with: "\n")
         guard normalizedDraft != currentBody else {
+            isTodoBodyDirty = false
+            todoBodyDraftBaseUpdatedAt = todo.updatedAt
             return
         }
 
         do {
             let request = parseTodoBody(todoBodyDraft)
-            _ = try commandService.updateTodo(in: list.id, todoID: todo.id, request: request)
+            let updatedTodo = try commandService.updateTodo(in: list.id, todoID: todo.id, request: request)
+            todoBodyDraft = Self.todoBodyText(from: updatedTodo)
+            todoBodyDraftBaseUpdatedAt = updatedTodo.updatedAt
+            isTodoBodyDirty = false
             editorErrorDescription = nil
         } catch {
             editorErrorDescription = error.localizedDescription
@@ -245,7 +293,7 @@ final class MainWindowViewModel: ObservableObject {
 
     func discardTodoEdits() {
         editorErrorDescription = nil
-        syncEditorDrafts()
+        syncEditorDrafts(with: store.document.lists)
     }
 
     func toggleCompletion(for todoID: UUID) {
@@ -310,31 +358,53 @@ final class MainWindowViewModel: ObservableObject {
         self.selectedTodoID = nil
     }
 
-    private func syncEditorDrafts() {
-        isSyncingDrafts = true
+    private func selectedList(in lists: [TodoList]) -> TodoList? {
+        guard let selectedListID else {
+            return nil
+        }
+        return lists.first(where: { $0.id == selectedListID })
+    }
 
-        if let selectedList {
-            if lastDraftedListID != selectedList.id || listTitleDraft == selectedList.title {
+    private func selectedTodo(in lists: [TodoList]) -> TodoItem? {
+        guard let selectedTodoID,
+              let selectedList = selectedList(in: lists) else {
+            return nil
+        }
+        return selectedList.todos.first(where: { $0.id == selectedTodoID })
+    }
+
+    private func syncEditorDrafts(with lists: [TodoList]) {
+        isSyncingDrafts = true
+        defer { isSyncingDrafts = false }
+
+        if let selectedList = selectedList(in: lists) {
+            if lastDraftedListID != selectedList.id || !isListTitleDirty {
                 listTitleDraft = selectedList.title
+                listTitleDraftBaseUpdatedAt = selectedList.updatedAt
+                isListTitleDirty = false
                 lastDraftedListID = selectedList.id
             }
         } else {
             listTitleDraft = ""
+            listTitleDraftBaseUpdatedAt = nil
+            isListTitleDirty = false
             lastDraftedListID = nil
         }
 
-        if let selectedTodo {
+        if let selectedTodo = selectedTodo(in: lists) {
             let bodyText = Self.todoBodyText(from: selectedTodo)
-            if lastDraftedTodoID != selectedTodo.id || todoBodyDraft == bodyText {
+            if lastDraftedTodoID != selectedTodo.id || !isTodoBodyDirty {
                 todoBodyDraft = bodyText
+                todoBodyDraftBaseUpdatedAt = selectedTodo.updatedAt
+                isTodoBodyDirty = false
                 lastDraftedTodoID = selectedTodo.id
             }
         } else {
             todoBodyDraft = ""
+            todoBodyDraftBaseUpdatedAt = nil
+            isTodoBodyDirty = false
             lastDraftedTodoID = nil
         }
-
-        isSyncingDrafts = false
     }
 
     private func parseTodoBody(_ body: String) -> TodoUpdateRequest {

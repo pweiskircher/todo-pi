@@ -66,6 +66,42 @@ final class MainWindowViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.editorErrorDescription)
     }
 
+    func testDraftsRefreshWhenStoreChangesExternallyAndEditorIsClean() async throws {
+        let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
+        let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
+        let store = TodoStore(document: TodoDocument.empty().withLists([list]))
+        let viewModel = makeViewModel(store: store)
+        viewModel.selectTodo(id: todo.id)
+
+        let updatedTodo = todo.withTitle("Buy oat milk").withNotes("2 cartons")
+        let updatedList = list.withTitle("Personal").withTodos([updatedTodo])
+        store.replace(with: TodoDocument.empty().withLists([updatedList]))
+
+        try await Task.sleep(for: .milliseconds(50))
+
+        XCTAssertEqual(viewModel.listTitleDraft, "Personal")
+        XCTAssertEqual(viewModel.todoBodyDraft, "Buy oat milk\n\n2 cartons")
+    }
+
+    func testSaveTodoBodyDoesNotOverwriteExternalChanges() {
+        let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
+        let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
+        let store = TodoStore(document: TodoDocument.empty().withLists([list]))
+        let viewModel = makeViewModel(store: store)
+        viewModel.selectTodo(id: todo.id)
+
+        viewModel.todoBodyDraft = "Local edit\n\nfrom me"
+
+        let updatedTodo = todo.withTitle("Remote change").withNotes("from pi")
+        store.replace(with: TodoDocument.empty().withLists([list.withTodos([updatedTodo])]))
+        viewModel.saveTodoBody()
+
+        XCTAssertEqual(viewModel.selectedTodo?.title, "Remote change")
+        XCTAssertEqual(viewModel.selectedTodo?.notes, "from pi")
+        XCTAssertEqual(viewModel.todoBodyDraft, "Local edit\n\nfrom me")
+        XCTAssertEqual(viewModel.editorErrorDescription, "This todo changed while you were editing. Your draft was not saved.")
+    }
+
     func testToggleCompletionUpdatesSelectedTodo() {
         let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
         let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
@@ -186,6 +222,14 @@ private extension TodoList {
     func withTodos(_ todos: [TodoItem]) -> TodoList {
         var copy = self
         copy.todos = todos
+        copy.updatedAt = updatedAt.addingTimeInterval(1)
+        return copy
+    }
+
+    func withTitle(_ title: String) -> TodoList {
+        var copy = self
+        copy.title = title
+        copy.updatedAt = updatedAt.addingTimeInterval(1)
         return copy
     }
 }
@@ -194,6 +238,20 @@ private extension TodoItem {
     func withSortOrder(_ sortOrder: Int) -> TodoItem {
         var copy = self
         copy.sortOrder = sortOrder
+        return copy
+    }
+
+    func withTitle(_ title: String) -> TodoItem {
+        var copy = self
+        copy.title = title
+        copy.updatedAt = updatedAt.addingTimeInterval(1)
+        return copy
+    }
+
+    func withNotes(_ notes: String?) -> TodoItem {
+        var copy = self
+        copy.notes = notes
+        copy.updatedAt = updatedAt.addingTimeInterval(1)
         return copy
     }
 }
