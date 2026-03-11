@@ -1,3 +1,4 @@
+import SplitView
 import SwiftUI
 
 struct TodoListView: View {
@@ -7,12 +8,30 @@ struct TodoListView: View {
         case todoNotes
     }
 
+    private enum Layout {
+        static let editorDefaultFraction: CGFloat = 0.42
+        static let minListHeight: CGFloat = 140
+        static let minEditorHeight: CGFloat = 260
+        static let dividerThickness: CGFloat = 1
+    }
+
     @ObservedObject var viewModel: MainWindowViewModel
 
     @State private var editingTodoID: UUID?
     @State private var editingTodoTitle = ""
     @State private var pendingDeleteTodo: TodoItem?
+    @StateObject private var editorFraction: FractionHolder
     @FocusState private var focusedField: FocusedField?
+
+    init(viewModel: MainWindowViewModel) {
+        self.viewModel = viewModel
+        _editorFraction = StateObject(
+            wrappedValue: FractionHolder.usingUserDefaults(
+                Layout.editorDefaultFraction,
+                key: "todoList.editorSplitFraction"
+            )
+        )
+    }
 
     var body: some View {
         Group {
@@ -22,12 +41,13 @@ struct TodoListView: View {
 
                     Divider()
 
-                    todoListSection(for: list)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-
                     if let todo = viewModel.selectedTodo {
-                        todoDetailsSection(for: todo)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        GeometryReader { proxy in
+                            editorSplit(for: list, todo: todo, availableHeight: proxy.size.height)
+                        }
+                    } else {
+                        todoListSection(for: list)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             } else {
@@ -70,6 +90,29 @@ struct TodoListView: View {
         } message: {
             Text("This will permanently delete \(pendingDeleteTodo?.title ?? "this todo").")
         }
+    }
+
+    private func editorSplit(for list: TodoList, todo: TodoItem, availableHeight: CGFloat) -> some View {
+        VSplit(
+            top: {
+                todoListSection(for: list)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            },
+            bottom: {
+                todoDetailsSection(for: todo)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        )
+        .fraction(editorFraction)
+        .constraints(
+            minPFraction: fraction(for: Layout.minListHeight, in: availableHeight),
+            minSFraction: fraction(for: Layout.minEditorHeight, in: availableHeight),
+            priority: .bottom
+        )
+        .splitter {
+            Splitter.line(color: Color(nsColor: .separatorColor), visibleThickness: Layout.dividerThickness)
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private func todoListSection(for list: TodoList) -> some View {
@@ -152,12 +195,9 @@ struct TodoListView: View {
     }
 
     private func todoDetailsSection(for todo: TodoItem) -> some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            todoDetailsCard(for: todo)
-                .padding(16)
-        }
+        todoDetailsCard(for: todo)
+            .padding(16)
+            .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private func todoDetailsCard(for todo: TodoItem) -> some View {
@@ -190,7 +230,7 @@ struct TodoListView: View {
                 .font(.body)
                 .scrollContentBackground(.hidden)
                 .focused($focusedField, equals: .todoNotes)
-                .frame(minHeight: 120)
+                .frame(minHeight: 180)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(Color(nsColor: .textBackgroundColor))
@@ -249,6 +289,14 @@ struct TodoListView: View {
         } else {
             viewModel.todoBodyDraft = "\(nextTitle)\n\n\(nextNotes)"
         }
+    }
+
+    private func fraction(for minHeight: CGFloat, in totalHeight: CGFloat) -> CGFloat {
+        guard totalHeight > 0 else {
+            return 0.5
+        }
+
+        return min(max(minHeight / totalHeight, 0.1), 0.9)
     }
 
     @ViewBuilder
