@@ -4,6 +4,12 @@ import Foundation
 enum PiSessionEvent: Equatable {
     case assistantMessageChanged(String)
     case assistantMessageCompleted(String)
+    case thinkingChanged(String)
+    case thinkingCompleted(String)
+    case toolCallChanged(key: String, text: String)
+    case toolCallCompleted(key: String, text: String, isError: Bool)
+    case toolExecutionChanged(key: String, text: String)
+    case toolExecutionCompleted(key: String, text: String, isError: Bool)
     case systemNotice(String)
 }
 
@@ -48,6 +54,10 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     private var startupTask: Task<Void, Error>?
     private var stderrText = ""
     private var streamedAssistantText = ""
+    private var streamedThinkingText = ""
+    private var activeToolCallKey: String?
+    private var activeToolCallName = "unknown"
+    private var activeToolCallArguments = ""
     private var lastNotice: String?
 
     init(
@@ -101,7 +111,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         stdinHandle = nil
         bridgeServer.stop()
         failPendingResponses(with: CancellationError())
-        streamedAssistantText = ""
+        resetStreamingState()
         state = .stopped
     }
 
@@ -114,8 +124,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         state = .starting
         stderrText = ""
         stdoutFramer = PiJSONLFramer()
-        streamedAssistantText = ""
-        lastNotice = nil
+        resetStreamingState()
 
         if let validationError = launchConfiguration.validationError {
             state = .failed(validationError)
@@ -193,6 +202,15 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         }
     }
 
+    private func resetStreamingState() {
+        streamedAssistantText = ""
+        streamedThinkingText = ""
+        activeToolCallKey = nil
+        activeToolCallName = "unknown"
+        activeToolCallArguments = ""
+        lastNotice = nil
+    }
+
     private func sendCommandAndAwaitResponse(
         _ command: [String: Any],
         id: String
@@ -254,6 +272,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
                 if role == "assistant" {
                     finalizeAssistantMessage(fallbackText: text)
                 }
+                finalizeThinkingMessage()
             case let .messageStart(role):
                 if role == "assistant" {
                     emitSystemNotice("pi is drafting a response…")
@@ -264,10 +283,13 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
                 if role == "assistant" {
                     finalizeAssistantMessage(fallbackText: text)
                 }
-            case let .toolExecutionStart(toolName):
-                emitSystemNotice("running tool: \(toolName)")
-            case let .toolExecutionEnd(toolName, isError):
-                emitSystemNotice(isError ? "tool failed: \(toolName)" : "finished tool: \(toolName)")
+                finalizeThinkingMessage()
+            case let .toolExecutionStart(info):
+                eventSubject.send(.toolExecutionChanged(key: info.toolCallId, text: formatToolExecutionText(prefix: "running tool", info: info)))
+            case let .toolExecutionUpdate(info):
+                eventSubject.send(.toolExecutionChanged(key: info.toolCallId, text: formatToolExecutionText(prefix: "running tool", info: info)))
+            case let .toolExecutionEnd(info, isError):
+                eventSubject.send(.toolExecutionCompleted(key: info.toolCallId, text: formatToolExecutionText(prefix: isError ? "tool failed" : "finished tool", info: info), isError: isError))
             case let .extensionError(error):
                 emitSystemNotice(error)
                 state = .failed(error)
@@ -281,6 +303,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         switch event {
         case .start:
             streamedAssistantText = ""
+            streamedThinkingText = ""
         case let .textDelta(delta):
             streamedAssistantText += delta
             eventSubject.send(.assistantMessageChanged(streamedAssistantText))
@@ -289,16 +312,50 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
                 streamedAssistantText = content
                 eventSubject.send(.assistantMessageChanged(content))
             }
+        case .thinkingStart:
+            streamedThinkingText = ""
+        case let .thinkingDelta(delta):
+            streamedThinkingText += delta
+            eventSubject.send(.thinkingChanged(streamedThinkingText))
+        case let .thinkingEnd(content):
+            if streamedThinkingText.isEmpty, let content, !content.isEmpty {
+                streamedThinkingText = content
+            }
+            finalizeThinkingMessage()
+        case let .toolCallStart(info):
+            let key = toolCallKey(for: info)
+            activeToolCallKey = key
+            activeToolCallName = info.name ?? "unknown"
+            activeToolCallArguments = info.argumentsText ?? ""
+            eventSubject.send(.toolCallChanged(key: key, text: formatToolCallText(name: activeToolCallName, arguments: activeToolCallArguments)))
+        case let .toolCallDelta(info, delta):
+            let key = toolCallKey(for: info)
+            activeToolCallKey = key
+            if let name = info.name {
+                activeToolCallName = name
+            }
+            activeToolCallArguments += delta
+            eventSubject.send(.toolCallChanged(key: key, text: formatToolCallText(name: activeToolCallName, arguments: activeToolCallArguments)))
+        case let .toolCallEnd(info):
+            let key = toolCallKey(for: info)
+            let name = info.name ?? activeToolCallName
+            let arguments = info.argumentsText ?? activeToolCallArguments
+            eventSubject.send(.toolCallCompleted(key: key, text: formatToolCallText(name: name, arguments: arguments), isError: false))
+            activeToolCallKey = nil
+            activeToolCallName = "unknown"
+            activeToolCallArguments = ""
         case let .done(reason):
             if reason == "error" || reason == "aborted" {
                 finalizeAssistantMessage(fallbackText: streamedAssistantText)
+                finalizeThinkingMessage()
             }
         case let .error(reason):
             if let reason, !reason.isEmpty {
-                eventSubject.send(.systemNotice("Assistant stream failed: \(reason)"))
+                emitSystemNotice("Assistant stream failed: \(reason)")
             }
             finalizeAssistantMessage(fallbackText: streamedAssistantText)
-        case .textStart, .thinkingStart, .thinkingDelta, .thinkingEnd, .toolCallStart, .toolCallDelta, .toolCallEnd:
+            finalizeThinkingMessage()
+        case .textStart:
             break
         }
     }
@@ -320,6 +377,43 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         streamedAssistantText = ""
     }
 
+    private func finalizeThinkingMessage() {
+        let trimmedText = streamedThinkingText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
+            streamedThinkingText = ""
+            return
+        }
+
+        eventSubject.send(.thinkingCompleted(trimmedText))
+        streamedThinkingText = ""
+    }
+
+    private func toolCallKey(for info: PiToolCallInfo) -> String {
+        info.id ?? info.name ?? "toolcall"
+    }
+
+    private func formatToolCallText(name: String, arguments: String) -> String {
+        let trimmedArguments = arguments.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedArguments.isEmpty {
+            return "tool call: \(name)"
+        }
+        return "tool call: \(name)\n\(trimmedArguments)"
+    }
+
+    private func formatToolExecutionText(prefix: String, info: PiToolExecutionInfo) -> String {
+        var lines = ["\(prefix): \(info.toolName)"]
+
+        if let argsText = info.argsText?.trimmingCharacters(in: .whitespacesAndNewlines), !argsText.isEmpty {
+            lines.append(argsText)
+        }
+
+        if let resultText = info.resultText?.trimmingCharacters(in: .whitespacesAndNewlines), !resultText.isEmpty {
+            lines.append(resultText)
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
     private func handleTermination(_ process: Process) {
         self.process = nil
         stdinHandle = nil
@@ -332,7 +426,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             statusMessage = "pi exited with status \(process.terminationStatus)"
         }
 
-        streamedAssistantText = ""
+        resetStreamingState()
 
         if process.terminationReason == .exit && process.terminationStatus == 0 {
             state = .stopped

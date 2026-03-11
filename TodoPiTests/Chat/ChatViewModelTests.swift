@@ -65,6 +65,25 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.messages[1].text, "Hello world")
     }
 
+    func testThinkingAndToolEventsAppearInTranscript() {
+        let sessionManager = FakePiSessionManager()
+        let viewModel = ChatViewModel(sessionManager: sessionManager)
+
+        sessionManager.events.send(.thinkingChanged("Plan step 1"))
+        sessionManager.events.send(.thinkingCompleted("Plan step 1\nPlan step 2"))
+        sessionManager.events.send(.toolCallChanged(key: "createTodo", text: "tool call: createTodo"))
+        sessionManager.events.send(.toolExecutionChanged(key: "call-1", text: "running tool: createTodo"))
+        sessionManager.events.send(.toolExecutionCompleted(key: "call-1", text: "finished tool: createTodo", isError: false))
+
+        XCTAssertEqual(viewModel.messages.count, 3)
+        XCTAssertEqual(viewModel.messages[0].role, .thinking)
+        XCTAssertEqual(viewModel.messages[0].text, "Plan step 1\nPlan step 2")
+        XCTAssertEqual(viewModel.messages[1].role, .tool)
+        XCTAssertEqual(viewModel.messages[1].text, "tool call: createTodo")
+        XCTAssertEqual(viewModel.messages[2].role, .tool)
+        XCTAssertEqual(viewModel.messages[2].text, "finished tool: createTodo")
+    }
+
     func testSendDraftAppendsSystemErrorWhenPromptFails() async {
         let sessionManager = FakePiSessionManager()
         sessionManager.sendPromptError = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "prompt failed"])

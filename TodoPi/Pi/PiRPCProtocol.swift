@@ -107,6 +107,19 @@ struct PiRPCResponse: Equatable {
     let data: JSONValue?
 }
 
+struct PiToolCallInfo: Equatable {
+    let id: String?
+    let name: String?
+    let argumentsText: String?
+}
+
+struct PiToolExecutionInfo: Equatable {
+    let toolCallId: String
+    let toolName: String
+    let argsText: String?
+    let resultText: String?
+}
+
 enum PiAssistantMessageEvent: Equatable {
     case start
     case textStart
@@ -115,9 +128,9 @@ enum PiAssistantMessageEvent: Equatable {
     case thinkingStart
     case thinkingDelta(String)
     case thinkingEnd(String?)
-    case toolCallStart(String?)
-    case toolCallDelta(String)
-    case toolCallEnd(String?)
+    case toolCallStart(PiToolCallInfo)
+    case toolCallDelta(PiToolCallInfo, String)
+    case toolCallEnd(PiToolCallInfo)
     case done(String?)
     case error(String?)
 }
@@ -130,8 +143,9 @@ enum PiRPCEvent: Equatable {
     case messageStart(role: String?)
     case messageUpdate(PiAssistantMessageEvent)
     case messageEnd(role: String?, text: String?)
-    case toolExecutionStart(String)
-    case toolExecutionEnd(String, isError: Bool)
+    case toolExecutionStart(PiToolExecutionInfo)
+    case toolExecutionUpdate(PiToolExecutionInfo)
+    case toolExecutionEnd(PiToolExecutionInfo, isError: Bool)
     case extensionError(String)
     case unknown(String)
 }
@@ -215,7 +229,7 @@ enum PiRPCProtocol {
             guard let success = object["success"] as? Bool else {
                 throw PiRPCProtocolError.invalidResponse("missing success flag")
             }
-            let dataValue = try (object["data"].map(JSONValue.init(any:)))
+            let dataValue = try object["data"].map(JSONValue.init(any:))
             return .response(
                 PiRPCResponse(
                     id: object["id"] as? String,
@@ -247,9 +261,11 @@ enum PiRPCProtocol {
         case "message_end":
             return .event(.messageEnd(role: extractMessageRole(from: object["message"]), text: extractMessageText(from: object["message"])))
         case "tool_execution_start":
-            return .event(.toolExecutionStart(object["toolName"] as? String ?? "unknown"))
+            return .event(.toolExecutionStart(parseToolExecutionInfo(from: object)))
+        case "tool_execution_update":
+            return .event(.toolExecutionUpdate(parseToolExecutionInfo(from: object)))
         case "tool_execution_end":
-            return .event(.toolExecutionEnd(object["toolName"] as? String ?? "unknown", isError: object["isError"] as? Bool ?? false))
+            return .event(.toolExecutionEnd(parseToolExecutionInfo(from: object), isError: object["isError"] as? Bool ?? false))
         case "extension_error":
             return .event(.extensionError(object["error"] as? String ?? text))
         default:
@@ -274,13 +290,11 @@ enum PiRPCProtocol {
         case "thinking_end":
             return .thinkingEnd(payload["content"] as? String)
         case "toolcall_start":
-            let toolName = (payload["partial"] as? [String: Any])?["name"] as? String
-            return .toolCallStart(toolName)
+            return .toolCallStart(parseToolCallInfo(from: payload["partial"] as? [String: Any]))
         case "toolcall_delta":
-            return .toolCallDelta(payload["delta"] as? String ?? "")
+            return .toolCallDelta(parseToolCallInfo(from: payload["partial"] as? [String: Any]), payload["delta"] as? String ?? "")
         case "toolcall_end":
-            let toolName = (payload["toolCall"] as? [String: Any])?["name"] as? String
-            return .toolCallEnd(toolName)
+            return .toolCallEnd(parseToolCallInfo(from: payload["toolCall"] as? [String: Any]))
         case "done":
             return .done(payload["reason"] as? String)
         case "error":
@@ -288,6 +302,23 @@ enum PiRPCProtocol {
         default:
             return .error(type)
         }
+    }
+
+    private static func parseToolCallInfo(from value: [String: Any]?) -> PiToolCallInfo {
+        PiToolCallInfo(
+            id: value?["id"] as? String,
+            name: value?["name"] as? String,
+            argumentsText: prettyJSONString(from: value?["arguments"])
+        )
+    }
+
+    private static func parseToolExecutionInfo(from object: [String: Any]) -> PiToolExecutionInfo {
+        PiToolExecutionInfo(
+            toolCallId: object["toolCallId"] as? String ?? object["toolName"] as? String ?? UUID().uuidString,
+            toolName: object["toolName"] as? String ?? "unknown",
+            argsText: prettyJSONString(from: object["args"]),
+            resultText: extractToolResultText(from: object["partialResult"] ?? object["result"])
+        )
     }
 
     private static func extractMessageRole(from value: Any?) -> String? {
@@ -299,11 +330,24 @@ enum PiRPCProtocol {
             return nil
         }
 
-        if let content = content as? String {
-            return content
+        return extractTextContent(from: content)
+    }
+
+    private static func extractToolResultText(from value: Any?) -> String? {
+        guard let object = value as? [String: Any], let content = object["content"] else {
+            return nil
         }
 
-        guard let blocks = content as? [[String: Any]] else {
+        return extractTextContent(from: content)
+    }
+
+    private static func extractTextContent(from value: Any) -> String? {
+        if let content = value as? String {
+            let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmedContent.isEmpty ? nil : trimmedContent
+        }
+
+        guard let blocks = value as? [[String: Any]] else {
             return nil
         }
 
@@ -312,8 +356,25 @@ enum PiRPCProtocol {
                 return nil
             }
             return block["text"] as? String
-        }.joined()
+        }.joined(separator: "\n")
 
-        return text.isEmpty ? nil : text
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedText.isEmpty ? nil : trimmedText
+    }
+
+    private static func prettyJSONString(from value: Any?) -> String? {
+        guard let value else {
+            return nil
+        }
+
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys]),
+              let text = String(data: data, encoding: .utf8)
+        else {
+            return nil
+        }
+
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedText.isEmpty ? nil : trimmedText
     }
 }

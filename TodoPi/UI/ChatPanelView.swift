@@ -50,6 +50,8 @@ struct ChatPanelView: View {
                                 .foregroundStyle(.secondary)
 
                             Text(message.text)
+                                .font(messageFont(for: message.role))
+                                .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(12)
@@ -80,6 +82,10 @@ struct ChatPanelView: View {
             return "TodoPi"
         case .system:
             return "System"
+        case .thinking:
+            return "Thinking"
+        case .tool:
+            return "Tool"
         }
     }
 
@@ -91,6 +97,19 @@ struct ChatPanelView: View {
             return Color.secondary.opacity(0.12)
         case .system:
             return Color.red.opacity(0.12)
+        case .thinking:
+            return Color.orange.opacity(0.12)
+        case .tool:
+            return Color.blue.opacity(0.12)
+        }
+    }
+
+    private func messageFont(for role: ChatMessage.Role) -> Font {
+        switch role {
+        case .thinking, .tool, .system:
+            return .system(.body, design: .monospaced)
+        case .user, .assistant:
+            return .body
         }
     }
 

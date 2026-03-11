@@ -6,6 +6,8 @@ struct ChatMessage: Identifiable, Equatable {
         case user
         case assistant
         case system
+        case thinking
+        case tool
     }
 
     let id: UUID
@@ -31,7 +33,7 @@ final class ChatViewModel: ObservableObject {
     private let sessionManager: PiSessionManaging?
     private let now: () -> Date
     private let makeID: () -> UUID
-    private var activeAssistantMessageID: UUID?
+    private var activeMessageIDsByKey: [String: UUID] = [:]
     private var cancellables: Set<AnyCancellable> = []
 
     init(
@@ -74,7 +76,7 @@ final class ChatViewModel: ObservableObject {
             do {
                 try await sessionManager.sendPrompt(message)
             } catch {
-                activeAssistantMessageID = nil
+                clearActiveMessage(key: "assistant")
                 appendMessage(role: .system, text: error.localizedDescription)
             }
         }
@@ -83,26 +85,38 @@ final class ChatViewModel: ObservableObject {
     private func handleSessionEvent(_ event: PiSessionEvent) {
         switch event {
         case let .assistantMessageChanged(text):
-            upsertAssistantMessage(text: text, isComplete: false)
+            upsertMessage(key: "assistant", role: .assistant, text: text, isComplete: false)
         case let .assistantMessageCompleted(text):
-            upsertAssistantMessage(text: text, isComplete: true)
+            upsertMessage(key: "assistant", role: .assistant, text: text, isComplete: true)
+        case let .thinkingChanged(text):
+            upsertMessage(key: "thinking", role: .thinking, text: text, isComplete: false)
+        case let .thinkingCompleted(text):
+            upsertMessage(key: "thinking", role: .thinking, text: text, isComplete: true)
+        case let .toolCallChanged(key, text):
+            upsertMessage(key: "toolcall:\(key)", role: .tool, text: text, isComplete: false)
+        case let .toolCallCompleted(key, text, _):
+            upsertMessage(key: "toolcall:\(key)", role: .tool, text: text, isComplete: true)
+        case let .toolExecutionChanged(key, text):
+            upsertMessage(key: "toolexec:\(key)", role: .tool, text: text, isComplete: false)
+        case let .toolExecutionCompleted(key, text, _):
+            upsertMessage(key: "toolexec:\(key)", role: .tool, text: text, isComplete: true)
         case let .systemNotice(text):
-            activeAssistantMessageID = nil
             appendMessage(role: .system, text: text)
         }
     }
 
-    private func upsertAssistantMessage(text: String, isComplete: Bool) {
-        guard !text.isEmpty else {
+    private func upsertMessage(key: String, role: ChatMessage.Role, text: String, isComplete: Bool) {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
             return
         }
 
-        if let activeAssistantMessageID,
-           let index = messages.firstIndex(where: { $0.id == activeAssistantMessageID }) {
+        if let messageID = activeMessageIDsByKey[key],
+           let index = messages.firstIndex(where: { $0.id == messageID }) {
             messages[index] = ChatMessage(
-                id: activeAssistantMessageID,
-                role: .assistant,
-                text: text,
+                id: messageID,
+                role: role,
+                text: trimmedText,
                 createdAt: messages[index].createdAt
             )
         } else {
@@ -110,25 +124,34 @@ final class ChatViewModel: ObservableObject {
             messages.append(
                 ChatMessage(
                     id: messageID,
-                    role: .assistant,
-                    text: text,
+                    role: role,
+                    text: trimmedText,
                     createdAt: now()
                 )
             )
-            activeAssistantMessageID = messageID
+            activeMessageIDsByKey[key] = messageID
         }
 
         if isComplete {
-            activeAssistantMessageID = nil
+            clearActiveMessage(key: key)
         }
     }
 
+    private func clearActiveMessage(key: String) {
+        activeMessageIDsByKey.removeValue(forKey: key)
+    }
+
     private func appendMessage(role: ChatMessage.Role, text: String) {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else {
+            return
+        }
+
         messages.append(
             ChatMessage(
                 id: makeID(),
                 role: role,
-                text: text,
+                text: trimmedText,
                 createdAt: now()
             )
         )

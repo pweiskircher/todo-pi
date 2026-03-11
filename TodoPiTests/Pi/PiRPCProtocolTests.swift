@@ -41,11 +41,39 @@ final class PiRPCProtocolTests: XCTestCase {
         XCTAssertEqual(message, .event(.messageUpdate(.textDelta("Hello"))))
     }
 
+    func testParseReturnsThinkingDeltaEvent() throws {
+        let line = Data("{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"thinking_delta\",\"delta\":\"Considering options\"}}".utf8)
+
+        let message = try PiRPCProtocol.parse(line: line)
+
+        XCTAssertEqual(message, .event(.messageUpdate(.thinkingDelta("Considering options"))))
+    }
+
+    func testParseReturnsToolExecutionUpdateWithDetails() throws {
+        let line = Data("{\"type\":\"tool_execution_update\",\"toolCallId\":\"call_123\",\"toolName\":\"createTodo\",\"args\":{\"title\":\"Buy milk\"},\"partialResult\":{\"content\":[{\"type\":\"text\",\"text\":\"created todo\"}]}}".utf8)
+
+        let message = try PiRPCProtocol.parse(line: line)
+
+        XCTAssertEqual(
+            message,
+            .event(
+                .toolExecutionUpdate(
+                    PiToolExecutionInfo(
+                        toolCallId: "call_123",
+                        toolName: "createTodo",
+                        argsText: "{\n  \"title\" : \"Buy milk\"\n}",
+                        resultText: "created todo"
+                    )
+                )
+            )
+        )
+    }
+
     func testParseExtractsAssistantTextFromMessageEnd() throws {
         let line = Data("{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"},{\"type\":\"text\",\"text\":\" world\"}]}}".utf8)
 
         let message = try PiRPCProtocol.parse(line: line)
 
-        XCTAssertEqual(message, .event(.messageEnd(role: "assistant", text: "Hello world")))
+        XCTAssertEqual(message, .event(.messageEnd(role: "assistant", text: "Hello\n world")))
     }
 }
