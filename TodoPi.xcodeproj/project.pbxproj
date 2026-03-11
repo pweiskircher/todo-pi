@@ -18,6 +18,13 @@
 		A0000028 /* JSONTodoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001A /* JSONTodoRepository.swift */; };
 		A0000029 /* TodoCommandServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001B /* TodoCommandServiceTests.swift */; };
 		A000002A /* JSONTodoRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001C /* JSONTodoRepositoryTests.swift */; };
+		A000002B /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001D /* ChatViewModel.swift */; };
+		A000002C /* MainWindowViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001E /* MainWindowViewModel.swift */; };
+		A000002D /* TodoSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000001F /* TodoSidebarView.swift */; };
+		A000002E /* TodoListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000002F /* TodoListView.swift */; };
+		A0000036 /* ChatPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000037 /* ChatPanelView.swift */; };
+		A0000038 /* MainWindowViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000039 /* MainWindowViewModelTests.swift */; };
+		A000003A /* ChatViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000003B /* ChatViewModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,6 +51,13 @@
 		A000001A /* JSONTodoRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTodoRepository.swift; sourceTree = "<group>"; };
 		A000001B /* TodoCommandServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoCommandServiceTests.swift; sourceTree = "<group>"; };
 		A000001C /* JSONTodoRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTodoRepositoryTests.swift; sourceTree = "<group>"; };
+		A000001D /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
+		A000001E /* MainWindowViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowViewModel.swift; sourceTree = "<group>"; };
+		A000001F /* TodoSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoSidebarView.swift; sourceTree = "<group>"; };
+		A000002F /* TodoListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoListView.swift; sourceTree = "<group>"; };
+		A0000037 /* ChatPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPanelView.swift; sourceTree = "<group>"; };
+		A0000039 /* MainWindowViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowViewModelTests.swift; sourceTree = "<group>"; };
+		A000003B /* ChatViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +103,7 @@
 				A0000007 /* UI */,
 				A0000008 /* Domain */,
 				A0000009 /* Persistence */,
+				A000000C /* Chat */,
 			);
 			path = TodoPi;
 			sourceTree = "<group>";
@@ -108,6 +123,8 @@
 			children = (
 				A000000A /* Domain */,
 				A000000B /* Persistence */,
+				A000000D /* UI */,
+				A000000E /* Chat */,
 				A0000016 /* MainWindowControllerTests.swift */,
 			);
 			path = TodoPiTests;
@@ -117,6 +134,10 @@
 			isa = PBXGroup;
 			children = (
 				A0000015 /* MainWindowView.swift */,
+				A000001E /* MainWindowViewModel.swift */,
+				A000001F /* TodoSidebarView.swift */,
+				A000002F /* TodoListView.swift */,
+				A0000037 /* ChatPanelView.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -153,6 +174,30 @@
 				A000001C /* JSONTodoRepositoryTests.swift */,
 			);
 			path = Persistence;
+			sourceTree = "<group>";
+		};
+		A000000C /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				A000001D /* ChatViewModel.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		A000000D /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				A0000039 /* MainWindowViewModelTests.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		A000000E /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				A000003B /* ChatViewModelTests.swift */,
+			);
+			path = Chat;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -252,6 +297,11 @@
 				A0000026 /* TodoStore.swift in Sources */,
 				A0000027 /* TodoCommandService.swift in Sources */,
 				A0000028 /* JSONTodoRepository.swift in Sources */,
+				A000002B /* ChatViewModel.swift in Sources */,
+				A000002C /* MainWindowViewModel.swift in Sources */,
+				A000002D /* TodoSidebarView.swift in Sources */,
+				A000002E /* TodoListView.swift in Sources */,
+				A0000036 /* ChatPanelView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -262,6 +312,8 @@
 				A0000024 /* MainWindowControllerTests.swift in Sources */,
 				A0000029 /* TodoCommandServiceTests.swift in Sources */,
 				A000002A /* JSONTodoRepositoryTests.swift in Sources */,
+				A0000038 /* MainWindowViewModelTests.swift in Sources */,
+				A000003A /* ChatViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

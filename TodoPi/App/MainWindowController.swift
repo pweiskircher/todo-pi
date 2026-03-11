@@ -3,7 +3,12 @@ import SwiftUI
 
 @MainActor
 final class MainWindowController {
+    private let viewModel: MainWindowViewModel
     private(set) var window: NSWindow?
+
+    init(viewModel: MainWindowViewModel) {
+        self.viewModel = viewModel
+    }
 
     @discardableResult
     func makeWindowIfNeeded() -> NSWindow {
@@ -11,12 +16,12 @@ final class MainWindowController {
             return window
         }
 
-        let rootView = MainWindowView()
+        let rootView = MainWindowView(viewModel: viewModel)
         let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)
         window.title = "TodoPi"
-        window.setContentSize(NSSize(width: 960, height: 640))
-        window.minSize = NSSize(width: 720, height: 480)
+        window.setContentSize(NSSize(width: 1100, height: 700))
+        window.minSize = NSSize(width: 820, height: 520)
         window.center()
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
