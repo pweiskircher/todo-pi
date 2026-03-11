@@ -64,6 +64,16 @@ function resultText(payload: unknown): string {
   return JSON.stringify(payload, null, 2);
 }
 
+function normalizeArguments(params: unknown): Record<string, unknown> {
+  if (!params || typeof params !== "object" || Array.isArray(params)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(params as Record<string, unknown>).filter(([key, value]) => key.trim().length > 0 && value !== undefined)
+  );
+}
+
 function registerBridgeTool(pi: ExtensionAPI, options: {
   name: string;
   label: string;
@@ -76,7 +86,7 @@ function registerBridgeTool(pi: ExtensionAPI, options: {
     description: options.description,
     parameters: options.parameters,
     async execute(_toolCallId, params) {
-      const response = await callBridge(options.name, (params ?? {}) as Record<string, unknown>);
+      const response = await callBridge(options.name, normalizeArguments(params));
       if (!response.isSuccess) {
         throw new Error(`${response.errorCode ?? "bridge_error"}: ${response.message ?? "request failed"}`);
       }
