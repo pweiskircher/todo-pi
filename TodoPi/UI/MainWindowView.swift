@@ -19,14 +19,8 @@ struct MainWindowView: View {
             }
 
             HSplitView {
-                TodoSidebarView(
-                    lists: viewModel.lists,
-                    selection: Binding(
-                        get: { viewModel.selectedListID },
-                        set: { viewModel.selectList(id: $0) }
-                    )
-                )
-                .frame(minWidth: 220, idealWidth: 260)
+                TodoSidebarView(viewModel: viewModel)
+                    .frame(minWidth: 220, idealWidth: 260)
 
                 TodoListView(viewModel: viewModel)
                     .frame(minWidth: 340)

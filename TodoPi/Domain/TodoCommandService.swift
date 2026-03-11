@@ -79,6 +79,16 @@ final class TodoCommandService {
         }
     }
 
+    func deleteList(listID: UUID) throws {
+        let timestamp = now()
+
+        try applyMutation { document in
+            let listIndex = try indexOfList(withID: listID, in: document)
+            document.lists.remove(at: listIndex)
+            document.updatedAt = timestamp
+        }
+    }
+
     @discardableResult
     func createTodo(
         in listID: UUID,
@@ -167,6 +177,27 @@ final class TodoCommandService {
             document.lists[listIndex].updatedAt = timestamp
             document.updatedAt = timestamp
             return document.lists[listIndex].todos[todoIndex]
+        }
+    }
+
+    func deleteTodo(in listID: UUID, todoID: UUID) throws {
+        let timestamp = now()
+
+        try applyMutation { document in
+            let listIndex = try indexOfList(withID: listID, in: document)
+            var list = document.lists[listIndex]
+            let todoIndex = try indexOfTodo(withID: todoID, in: list)
+
+            list.todos.remove(at: todoIndex)
+            list.todos = list.todos.enumerated().map { index, item in
+                var updatedItem = item
+                updatedItem.sortOrder = index
+                updatedItem.updatedAt = timestamp
+                return updatedItem
+            }
+            list.updatedAt = timestamp
+            document.lists[listIndex] = list
+            document.updatedAt = timestamp
         }
     }
 

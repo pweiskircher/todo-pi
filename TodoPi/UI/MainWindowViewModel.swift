@@ -98,6 +98,58 @@ final class MainWindowViewModel: ObservableObject {
         syncEditorDrafts()
     }
 
+    func createList() {
+        do {
+            let list = try commandService.createList(title: uniqueTitle(base: "New List", in: lists.map(\.title)))
+            selectedListID = list.id
+            selectedTodoID = nil
+            editorErrorDescription = nil
+            syncEditorDrafts()
+        } catch {
+            editorErrorDescription = error.localizedDescription
+        }
+    }
+
+    func deleteList(id: UUID) {
+        do {
+            try commandService.deleteList(listID: id)
+            editorErrorDescription = nil
+        } catch {
+            editorErrorDescription = error.localizedDescription
+        }
+    }
+
+    func createTodo() {
+        guard let list = selectedList else {
+            return
+        }
+
+        do {
+            let todo = try commandService.createTodo(
+                in: list.id,
+                title: uniqueTitle(base: "New Todo", in: list.todos.map(\.title))
+            )
+            selectedTodoID = todo.id
+            editorErrorDescription = nil
+            syncEditorDrafts()
+        } catch {
+            editorErrorDescription = error.localizedDescription
+        }
+    }
+
+    func deleteTodo(id: UUID) {
+        guard let list = selectedList else {
+            return
+        }
+
+        do {
+            try commandService.deleteTodo(in: list.id, todoID: id)
+            editorErrorDescription = nil
+        } catch {
+            editorErrorDescription = error.localizedDescription
+        }
+    }
+
     func saveListTitle() {
         guard let list = selectedList else {
             return
@@ -192,6 +244,18 @@ final class MainWindowViewModel: ObservableObject {
             title: title,
             notes: trimmedNotes.isEmpty ? .clear : .set(notesText)
         )
+    }
+
+    private func uniqueTitle(base: String, in existingTitles: [String]) -> String {
+        if !existingTitles.contains(base) {
+            return base
+        }
+
+        var index = 2
+        while existingTitles.contains("\(base) \(index)") {
+            index += 1
+        }
+        return "\(base) \(index)"
     }
 
     private static func todoBodyText(from todo: TodoItem) -> String {

@@ -64,6 +64,29 @@ final class MainWindowViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedTodo?.isCompleted, false)
     }
 
+    func testCreateAndDeleteListAndTodoUpdateSelection() {
+        let store = TodoStore(document: TodoDocument.empty())
+        let viewModel = makeViewModel(store: store)
+
+        viewModel.createList()
+        XCTAssertEqual(viewModel.lists.count, 1)
+        XCTAssertEqual(viewModel.selectedList?.title, "New List")
+
+        viewModel.createTodo()
+        XCTAssertEqual(viewModel.selectedTodo?.title, "New Todo")
+
+        if let todoID = viewModel.selectedTodoID {
+            viewModel.deleteTodo(id: todoID)
+        }
+        XCTAssertNil(viewModel.selectedTodo)
+
+        if let listID = viewModel.selectedListID {
+            viewModel.deleteList(id: listID)
+        }
+        XCTAssertTrue(viewModel.lists.isEmpty)
+        XCTAssertNil(viewModel.selectedList)
+    }
+
     private func makeViewModel(store: TodoStore) -> MainWindowViewModel {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

@@ -6,12 +6,17 @@ struct TodoListView: View {
     var body: some View {
         Group {
             if let list = viewModel.selectedList {
-                VSplitView {
+                VStack(spacing: 0) {
+                    header(for: list)
+
+                    Divider()
+
                     todoListSection(for: list)
-                        .frame(minHeight: 240)
+
+                    Divider()
 
                     todoEditorSection
-                        .frame(minHeight: 220)
+                        .frame(height: 290)
                 }
             } else {
                 ContentUnavailableView(
@@ -26,14 +31,12 @@ struct TodoListView: View {
     }
 
     private func todoListSection(for list: TodoList) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header(for: list)
-
+        Group {
             if list.todos.isEmpty {
                 ContentUnavailableView(
                     "No todos in this list",
                     systemImage: "checklist",
-                    description: Text("Use chat to create todos, then edit them here.")
+                    description: Text("Add a todo to start filling out this list.")
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -72,6 +75,17 @@ struct TodoListView: View {
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
                         .tag(Optional(todo.id))
+                        .contextMenu {
+                            Button(todo.isCompleted ? "Mark Incomplete" : "Mark Complete") {
+                                viewModel.toggleCompletion(for: todo.id)
+                            }
+
+                            Divider()
+
+                            Button("Delete Todo", role: .destructive) {
+                                viewModel.deleteTodo(id: todo.id)
+                            }
+                        }
                     }
                 }
                 .listStyle(.inset)
@@ -81,7 +95,7 @@ struct TodoListView: View {
 
     private func header(for list: TodoList) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 TextField("List title", text: $viewModel.listTitleDraft)
                     .textFieldStyle(.roundedBorder)
                     .font(.title2)
@@ -92,6 +106,10 @@ struct TodoListView: View {
 
                 Button("Save") {
                     viewModel.saveListTitle()
+                }
+
+                Button("New Todo") {
+                    viewModel.createTodo()
                 }
             }
 
@@ -106,15 +124,14 @@ struct TodoListView: View {
                     .foregroundStyle(.red)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
+        .padding(16)
     }
 
     private var todoEditorSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let todo = viewModel.selectedTodo {
                 HStack {
-                    Text("Todo Editor")
+                    Text("Todo Details")
                         .font(.headline)
 
                     Spacer()

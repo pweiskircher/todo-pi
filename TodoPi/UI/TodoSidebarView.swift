@@ -1,34 +1,63 @@
 import SwiftUI
 
 struct TodoSidebarView: View {
-    let lists: [TodoList]
-    @Binding var selection: UUID?
+    @ObservedObject var viewModel: MainWindowViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Lists", systemImage: "sidebar.left")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+            HStack {
+                Label("Lists", systemImage: "sidebar.left")
+                    .font(.title3)
+                    .fontWeight(.semibold)
 
-            if lists.isEmpty {
+                Spacer()
+
+                Button {
+                    viewModel.createList()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .help("New List")
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+
+            if viewModel.lists.isEmpty {
                 ContentUnavailableView(
                     "No lists yet",
                     systemImage: "tray",
-                    description: Text("Lists will appear here once the app loads saved todo data.")
+                    description: Text("Create a list to start organizing your todos.")
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(lists, selection: $selection) { list in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(list.title)
-                            .fontWeight(.medium)
-                        Text("\(list.todos.count) todos")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                List(
+                    selection: Binding(
+                        get: { viewModel.selectedListID },
+                        set: { viewModel.selectList(id: $0) }
+                    )
+                ) {
+                    ForEach(viewModel.lists) { list in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(list.title)
+                                .fontWeight(.medium)
+                            Text("\(list.todos.count) todos")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .tag(Optional(list.id))
+                        .contextMenu {
+                            Button("New Todo") {
+                                viewModel.selectList(id: list.id)
+                                viewModel.createTodo()
+                            }
+
+                            Divider()
+
+                            Button("Delete List", role: .destructive) {
+                                viewModel.deleteList(id: list.id)
+                            }
+                        }
                     }
-                    .tag(Optional(list.id))
                 }
                 .listStyle(.sidebar)
             }

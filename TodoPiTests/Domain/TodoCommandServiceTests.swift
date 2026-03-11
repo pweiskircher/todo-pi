@@ -75,6 +75,22 @@ final class TodoCommandServiceTests: XCTestCase {
         XCTAssertEqual(store.document.lists.first?.title, "Personal")
     }
 
+    func testDeleteTodoAndListPersist() throws {
+        let tempDirectory = try makeTempDirectory()
+        let repository = JSONTodoRepository(fileURL: tempDirectory.appending(path: "todos.json"))
+        let store = TodoStore(document: .empty())
+        let service = TodoCommandService(store: store, repository: repository)
+
+        let list = try service.createList(title: "Inbox")
+        let todo = try service.createTodo(in: list.id, title: "Buy milk")
+
+        try service.deleteTodo(in: list.id, todoID: todo.id)
+        XCTAssertEqual(store.document.lists.first?.todos.count, 0)
+
+        try service.deleteList(listID: list.id)
+        XCTAssertTrue(store.document.lists.isEmpty)
+    }
+
     func testCreateTodoRejectsUnknownList() {
         let service = makeService()
         let unknownListID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
