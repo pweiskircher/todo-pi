@@ -68,7 +68,7 @@ struct ChatPanelView: View {
             .fontWeight(.semibold)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.secondary.opacity(0.15))
+            .background(statusBackgroundColor)
             .clipShape(Capsule())
     }
 
@@ -76,6 +76,29 @@ struct ChatPanelView: View {
         switch viewModel.status {
         case .offline:
             return "Offline"
+        case .starting:
+            return "Starting"
+        case .ready:
+            return "Ready"
+        case .busy:
+            return "Busy"
+        case .failed:
+            return "Failed"
+        }
+    }
+
+    private var statusBackgroundColor: Color {
+        switch viewModel.status {
+        case .offline:
+            return Color.secondary.opacity(0.15)
+        case .starting:
+            return Color.orange.opacity(0.2)
+        case .ready:
+            return Color.green.opacity(0.2)
+        case .busy:
+            return Color.blue.opacity(0.2)
+        case .failed:
+            return Color.red.opacity(0.2)
         }
     }
 }

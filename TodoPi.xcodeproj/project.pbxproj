@@ -25,6 +25,13 @@
 		A0000036 /* ChatPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000037 /* ChatPanelView.swift */; };
 		A0000038 /* MainWindowViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000039 /* MainWindowViewModelTests.swift */; };
 		A000003A /* ChatViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000003B /* ChatViewModelTests.swift */; };
+		A000003C /* PiRPCProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000003D /* PiRPCProtocol.swift */; };
+		A000003E /* PiLaunchConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000003F /* PiLaunchConfiguration.swift */; };
+		A0000044 /* PiBridgeServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000045 /* PiBridgeServer.swift */; };
+		A0000046 /* PiSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000047 /* PiSessionManager.swift */; };
+		A0000048 /* PiRPCProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000049 /* PiRPCProtocolTests.swift */; };
+		A000004A /* PiBridgeServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000004B /* PiBridgeServerTests.swift */; };
+		A000004C /* todo-app-tools.ts in Resources */ = {isa = PBXBuildFile; fileRef = A000004D /* todo-app-tools.ts */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,6 +65,13 @@
 		A0000037 /* ChatPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPanelView.swift; sourceTree = "<group>"; };
 		A0000039 /* MainWindowViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowViewModelTests.swift; sourceTree = "<group>"; };
 		A000003B /* ChatViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModelTests.swift; sourceTree = "<group>"; };
+		A000003D /* PiRPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiRPCProtocol.swift; sourceTree = "<group>"; };
+		A000003F /* PiLaunchConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiLaunchConfiguration.swift; sourceTree = "<group>"; };
+		A0000045 /* PiBridgeServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiBridgeServer.swift; sourceTree = "<group>"; };
+		A0000047 /* PiSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiSessionManager.swift; sourceTree = "<group>"; };
+		A0000049 /* PiRPCProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiRPCProtocolTests.swift; sourceTree = "<group>"; };
+		A000004B /* PiBridgeServerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiBridgeServerTests.swift; sourceTree = "<group>"; };
+		A000004D /* todo-app-tools.ts */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "pi-extension/todo-app-tools.ts"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,6 +118,8 @@
 				A0000008 /* Domain */,
 				A0000009 /* Persistence */,
 				A000000C /* Chat */,
+				A000000F /* Pi */,
+				A0000010A /* Resources */,
 			);
 			path = TodoPi;
 			sourceTree = "<group>";
@@ -125,6 +141,7 @@
 				A000000B /* Persistence */,
 				A000000D /* UI */,
 				A000000E /* Chat */,
+				A0000011A /* Pi */,
 				A0000016 /* MainWindowControllerTests.swift */,
 			);
 			path = TodoPiTests;
@@ -200,6 +217,34 @@
 			path = Chat;
 			sourceTree = "<group>";
 		};
+		A000000F /* Pi */ = {
+			isa = PBXGroup;
+			children = (
+				A000003D /* PiRPCProtocol.swift */,
+				A000003F /* PiLaunchConfiguration.swift */,
+				A0000045 /* PiBridgeServer.swift */,
+				A0000047 /* PiSessionManager.swift */,
+			);
+			path = Pi;
+			sourceTree = "<group>";
+		};
+		A0000010A /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A000004D /* todo-app-tools.ts */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A0000011A /* Pi */ = {
+			isa = PBXGroup;
+			children = (
+				A0000049 /* PiRPCProtocolTests.swift */,
+				A000004B /* PiBridgeServerTests.swift */,
+			);
+			path = Pi;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -272,6 +317,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A000004C /* todo-app-tools.ts in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -302,6 +348,10 @@
 				A000002D /* TodoSidebarView.swift in Sources */,
 				A000002E /* TodoListView.swift in Sources */,
 				A0000036 /* ChatPanelView.swift in Sources */,
+				A000003C /* PiRPCProtocol.swift in Sources */,
+				A000003E /* PiLaunchConfiguration.swift in Sources */,
+				A0000044 /* PiBridgeServer.swift in Sources */,
+				A0000046 /* PiSessionManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -314,6 +364,8 @@
 				A000002A /* JSONTodoRepositoryTests.swift in Sources */,
 				A0000038 /* MainWindowViewModelTests.swift in Sources */,
 				A000003A /* ChatViewModelTests.swift in Sources */,
+				A0000048 /* PiRPCProtocolTests.swift in Sources */,
+				A000004A /* PiBridgeServerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

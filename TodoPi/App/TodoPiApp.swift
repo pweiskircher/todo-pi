@@ -15,9 +15,31 @@ struct TodoPiApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = TodoStore()
-    private let chatViewModel = ChatViewModel()
     private lazy var repository = JSONTodoRepository()
     private lazy var commandService = TodoCommandService(store: store, repository: repository)
+
+    private lazy var socketURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("todopi-\(UUID().uuidString).sock", isDirectory: false)
+    private lazy var bridgeToken = UUID().uuidString
+    private lazy var bridgeServer = PiBridgeServer(
+        socketURL: socketURL,
+        authToken: bridgeToken,
+        store: store,
+        commandService: commandService
+    )
+    private lazy var launchConfiguration = PiLaunchConfiguration.defaultExtensionURL().map {
+        PiLaunchConfiguration(
+            workingDirectoryURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+            extensionURL: $0,
+            socketURL: socketURL,
+            authToken: bridgeToken
+        )
+    }
+    private lazy var piSessionManager = PiSessionManager(
+        launchConfiguration: launchConfiguration,
+        bridgeServer: bridgeServer
+    )
+    private lazy var chatViewModel = ChatViewModel(sessionManager: piSessionManager)
     private lazy var mainWindowViewModel = MainWindowViewModel(store: store, chatViewModel: chatViewModel)
     private lazy var mainWindowController = MainWindowController(viewModel: mainWindowViewModel)
     private var menuBarController: MenuBarController?
@@ -34,5 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarController = MenuBarController { [weak mainWindowController] in
             mainWindowController?.showWindow()
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        piSessionManager.stop()
     }
 }
