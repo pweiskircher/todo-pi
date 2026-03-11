@@ -190,6 +190,7 @@ struct TodoListView: View {
     private func row(for todo: TodoItem) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Button {
+                viewModel.selectTodo(id: todo.id)
                 viewModel.toggleCompletion(for: todo.id)
             } label: {
                 Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
@@ -218,14 +219,21 @@ struct TodoListView: View {
                         .lineLimit(2)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 0)
         }
         .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            beginEditing(todo)
+        .onTapGesture {
+            viewModel.selectTodo(id: todo.id)
         }
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                beginEditing(todo)
+            }
+        )
     }
 
     private func beginEditing(_ todo: TodoItem) {
