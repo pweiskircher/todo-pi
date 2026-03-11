@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MainWindowView: View {
@@ -18,18 +19,69 @@ struct MainWindowView: View {
                     .background(Color.orange.opacity(0.18))
             }
 
-            HSplitView {
-                TodoSidebarView(viewModel: viewModel)
-                    .frame(minWidth: 220, idealWidth: 260)
-
-                TodoListView(viewModel: viewModel)
-                    .frame(minWidth: 340)
-
-                ChatPanelView(viewModel: viewModel.chatViewModel)
-                    .frame(minWidth: 320)
-            }
+            MainWindowSplitView(viewModel: viewModel)
         }
         .frame(minWidth: 820, minHeight: 520)
+    }
+}
+
+private struct MainWindowSplitView: NSViewControllerRepresentable {
+    let viewModel: MainWindowViewModel
+
+    func makeNSViewController(context: Context) -> MainWindowSplitViewController {
+        MainWindowSplitViewController(viewModel: viewModel)
+    }
+
+    func updateNSViewController(_ nsViewController: MainWindowSplitViewController, context: Context) {
+        nsViewController.update(viewModel: viewModel)
+    }
+}
+
+@MainActor
+private final class MainWindowSplitViewController: NSSplitViewController {
+    private let sidebarController = NSHostingController(rootView: AnyView(EmptyView()))
+    private let listController = NSHostingController(rootView: AnyView(EmptyView()))
+    private let chatController = NSHostingController(rootView: AnyView(EmptyView()))
+
+    init(viewModel: MainWindowViewModel) {
+        super.init(nibName: nil, bundle: nil)
+        configureSplitItems()
+        update(viewModel: viewModel)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(viewModel: MainWindowViewModel) {
+        sidebarController.rootView = AnyView(TodoSidebarView(viewModel: viewModel))
+        listController.rootView = AnyView(TodoListView(viewModel: viewModel))
+        chatController.rootView = AnyView(ChatPanelView(viewModel: viewModel.chatViewModel))
+    }
+
+    private func configureSplitItems() {
+        splitView.autosaveName = NSSplitView.AutosaveName("TodoPiMainWindowSplitView")
+        splitView.dividerStyle = .thin
+
+        let sidebarItem = NSSplitViewItem(viewController: sidebarController)
+        sidebarItem.minimumThickness = 220
+        sidebarItem.canCollapse = false
+        sidebarItem.holdingPriority = .defaultHigh
+
+        let listItem = NSSplitViewItem(viewController: listController)
+        listItem.minimumThickness = 340
+        listItem.canCollapse = false
+        listItem.holdingPriority = .defaultLow
+
+        let chatItem = NSSplitViewItem(viewController: chatController)
+        chatItem.minimumThickness = 320
+        chatItem.canCollapse = false
+        chatItem.holdingPriority = .defaultHigh
+
+        addSplitViewItem(sidebarItem)
+        addSplitViewItem(listItem)
+        addSplitViewItem(chatItem)
     }
 }
 
