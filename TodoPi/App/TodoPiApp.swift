@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var socketURL = FileManager.default.temporaryDirectory
         .appendingPathComponent("todopi-\(UUID().uuidString).sock", isDirectory: false)
     private lazy var piWorkingDirectoryURL = PiLaunchConfiguration.defaultWorkingDirectoryURL()
+    private lazy var piConfigDirectoryURL = PiLaunchConfiguration.defaultConfigDirectoryURL()
     private lazy var bridgeToken = UUID().uuidString
     private lazy var bridgeServer = PiBridgeServer(
         socketURL: socketURL,
@@ -34,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var launchConfiguration = PiLaunchConfiguration.defaultExtensionURL().map {
         PiLaunchConfiguration(
             workingDirectoryURL: piWorkingDirectoryURL,
+            configDirectoryURL: piConfigDirectoryURL,
             extensionURL: $0,
             socketURL: socketURL,
             authToken: bridgeToken
@@ -51,11 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        do {
-            try FileManager.default.createDirectory(at: piWorkingDirectoryURL, withIntermediateDirectories: true)
-        } catch {
-            NSLog("Failed to create pi working directory: \(error.localizedDescription)")
-        }
+        preparePiRuntimeEnvironment()
 
         do {
             try commandService.load()
@@ -70,5 +68,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         piSessionManager.stop()
+    }
+
+    private func preparePiRuntimeEnvironment() {
+        do {
+            try FileManager.default.createDirectory(at: piWorkingDirectoryURL, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: piConfigDirectoryURL, withIntermediateDirectories: true)
+        } catch {
+            NSLog("Failed to create pi runtime directories: \(error.localizedDescription)")
+            PiDebugLog.write("Failed to create pi runtime directories: \(error.localizedDescription)")
+        }
+
+        linkSharedPiAuthIfAvailable()
+    }
+
+    private func linkSharedPiAuthIfAvailable() {
+        let fileManager = FileManager.default
+        let sharedAuthURL = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".pi", isDirectory: true)
+            .appendingPathComponent("agent", isDirectory: true)
+            .appendingPathComponent("auth.json", isDirectory: false)
+        let targetAuthURL = piConfigDirectoryURL.appendingPathComponent("auth.json", isDirectory: false)
+
+        guard fileManager.fileExists(atPath: sharedAuthURL.path) else {
+            PiDebugLog.write("Shared pi auth not found at \(sharedAuthURL.path)")
+            return
+        }
+
+        do {
+            try? fileManager.removeItem(at: targetAuthURL)
+            try fileManager.createSymbolicLink(at: targetAuthURL, withDestinationURL: sharedAuthURL)
+            PiDebugLog.write("Linked shared pi auth from \(sharedAuthURL.path) to \(targetAuthURL.path)")
+        } catch {
+            NSLog("Failed to link pi auth storage: \(error.localizedDescription)")
+            PiDebugLog.write("Failed to link pi auth storage: \(error.localizedDescription)")
+        }
     }
 }

@@ -22,6 +22,26 @@ final class PiLaunchConfigurationTests: XCTestCase {
         )
     }
 
+    func testDefaultConfigDirectoryURLUsesApplicationSupportSubdirectory() throws {
+        let fileManager = FileManager.default
+        let rootURL = try makeTemporaryDirectory()
+        defer { try? fileManager.removeItem(at: rootURL) }
+
+        let applicationSupportURL = rootURL.appendingPathComponent("Application Support", isDirectory: true)
+        let configDirectoryURL = PiLaunchConfiguration.defaultConfigDirectoryURL(
+            fileManager: fileManager,
+            applicationSupportURL: applicationSupportURL
+        )
+
+        XCTAssertEqual(
+            configDirectoryURL.path,
+            applicationSupportURL
+                .appendingPathComponent("TodoPi", isDirectory: true)
+                .appendingPathComponent("pi-agent", isDirectory: true)
+                .path
+        )
+    }
+
     func testExtensionFingerprintReflectsFileContents() throws {
         let fileManager = FileManager.default
         let rootURL = try makeTemporaryDirectory()
@@ -67,8 +87,10 @@ final class PiLaunchConfigurationTests: XCTestCase {
         let piURL = binURL.appendingPathComponent("pi", isDirectory: false)
         try makeExecutable(at: piURL)
 
+        let configDirectoryURL = rootURL.appendingPathComponent("pi-agent", isDirectory: true)
         let configuration = PiLaunchConfiguration(
             workingDirectoryURL: rootURL,
+            configDirectoryURL: configDirectoryURL,
             extensionURL: rootURL.appendingPathComponent("todo-app-tools.ts", isDirectory: false),
             socketURL: rootURL.appendingPathComponent("todo.sock", isDirectory: false),
             authToken: "token",
@@ -83,9 +105,14 @@ final class PiLaunchConfigurationTests: XCTestCase {
             "--mode", "rpc",
             "--no-session",
             "--no-tools",
+            "--no-extensions",
+            "--no-skills",
+            "--no-prompt-templates",
+            "--no-themes",
             "--extension", rootURL.appendingPathComponent("todo-app-tools.ts", isDirectory: false).path
         ])
         XCTAssertEqual(configuration.environment["PATH"], binURL.path)
+        XCTAssertEqual(configuration.environment["PI_CODING_AGENT_DIR"], configDirectoryURL.path)
     }
 
     func testInitializerResolvesPiFromMiseInstallLocationWhenPATHDoesNotContainIt() throws {

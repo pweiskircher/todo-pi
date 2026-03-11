@@ -3,6 +3,7 @@ import Foundation
 
 struct PiLaunchConfiguration {
     let workingDirectoryURL: URL
+    let configDirectoryURL: URL?
     let extensionURL: URL
     let socketURL: URL
     let authToken: String
@@ -15,6 +16,7 @@ struct PiLaunchConfiguration {
 
     init(
         workingDirectoryURL: URL,
+        configDirectoryURL: URL? = nil,
         extensionURL: URL,
         socketURL: URL,
         authToken: String,
@@ -24,6 +26,7 @@ struct PiLaunchConfiguration {
         fileManager: FileManager = .default
     ) {
         self.workingDirectoryURL = workingDirectoryURL
+        self.configDirectoryURL = configDirectoryURL
         self.extensionURL = extensionURL
         self.socketURL = socketURL
         self.authToken = authToken
@@ -53,6 +56,10 @@ struct PiLaunchConfiguration {
             "--mode", "rpc",
             "--no-session",
             "--no-tools",
+            "--no-extensions",
+            "--no-skills",
+            "--no-prompt-templates",
+            "--no-themes",
             "--extension", extensionURL.path
         ]
     }
@@ -64,6 +71,9 @@ struct PiLaunchConfiguration {
                 executableURL.deletingLastPathComponent().path,
                 to: environment["PATH"]
             )
+        }
+        if let configDirectoryURL {
+            environment["PI_CODING_AGENT_DIR"] = configDirectoryURL.path
         }
         environment["TODO_PI_SOCKET"] = socketURL.path
         environment["TODO_PI_TOKEN"] = authToken
@@ -97,6 +107,16 @@ struct PiLaunchConfiguration {
         return baseURL
             .appendingPathComponent("TodoPi", isDirectory: true)
             .appendingPathComponent("pi-runtime", isDirectory: true)
+    }
+
+    static func defaultConfigDirectoryURL(
+        fileManager: FileManager = .default,
+        applicationSupportURL: URL? = nil
+    ) -> URL {
+        let baseURL = applicationSupportURL ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return baseURL
+            .appendingPathComponent("TodoPi", isDirectory: true)
+            .appendingPathComponent("pi-agent", isDirectory: true)
     }
 
     private static func resolveExecutableURL(
