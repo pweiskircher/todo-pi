@@ -123,10 +123,6 @@ struct TodoListView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Text("Drag todos to reorder. Double-click a todo title to rename it inline.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
             if let editorErrorDescription = viewModel.editorErrorDescription {
                 Text(editorErrorDescription)
                     .font(.callout)
@@ -151,10 +147,6 @@ struct TodoListView: View {
                             .font(.subheadline)
                     }
                 }
-
-                Text("First line is the title. Everything below becomes the todo details.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
 
                 TextEditor(text: $viewModel.todoBodyDraft)
                     .font(.body)
