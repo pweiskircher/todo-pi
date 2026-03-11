@@ -1,4 +1,5 @@
 import Combine
+import Darwin
 import Foundation
 
 enum PiSessionEvent: Equatable {
@@ -60,6 +61,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     private var activeToolCallKey: String?
     private var activeToolCallName = "unknown"
     private var activeToolCallArguments = ""
+    private var activeExtensionFingerprint: String?
     private var lastNotice: String?
 
     init(
@@ -73,6 +75,10 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     func startIfNeeded() async throws {
         switch state {
         case .ready, .busy:
+            if shouldRestartManagedProcessForConfigurationChange() {
+                stop()
+                break
+            }
             return
         case .starting:
             if let startupTask {
@@ -108,12 +114,17 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     }
 
     func stop() {
-        process?.terminate()
+        if let process {
+            process.terminationHandler = nil
+            terminateManagedProcess(process.processIdentifier)
+        }
+
         process = nil
         stdinHandle = nil
         bridgeServer.stop()
         failPendingResponses(with: CancellationError())
         resetStreamingState()
+        activeExtensionFingerprint = nil
         state = .stopped
     }
 
@@ -190,6 +201,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
 
         self.process = process
         self.stdinHandle = stdinPipe.fileHandleForWriting
+        self.activeExtensionFingerprint = launchConfiguration.extensionFingerprint
 
         let startupID = UUID().uuidString
         let response = try await sendCommandAndAwaitResponse(PiRPCCommand.getCommands(id: startupID), id: startupID)
@@ -437,6 +449,42 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         return lines.joined(separator: "\n")
     }
 
+    private func shouldRestartManagedProcessForConfigurationChange() -> Bool {
+        guard process != nil else {
+            return false
+        }
+
+        return launchConfiguration?.extensionFingerprint != activeExtensionFingerprint
+    }
+
+    private func terminateManagedProcess(_ pid: Int32) {
+        guard pid > 0, processExists(pid) else {
+            return
+        }
+
+        _ = Darwin.kill(pid, SIGTERM)
+        let deadline = Date().addingTimeInterval(1)
+        while processExists(pid), Date() < deadline {
+            usleep(50_000)
+        }
+
+        if processExists(pid) {
+            _ = Darwin.kill(pid, SIGKILL)
+        }
+    }
+
+    private func processExists(_ pid: Int32) -> Bool {
+        guard pid > 0 else {
+            return false
+        }
+
+        if Darwin.kill(pid, 0) == 0 {
+            return true
+        }
+
+        return errno == EPERM
+    }
+
     private func handleTermination(_ process: Process) {
         self.process = nil
         stdinHandle = nil
@@ -450,6 +498,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         }
 
         resetStreamingState()
+        activeExtensionFingerprint = nil
 
         if process.terminationReason == .exit && process.terminationStatus == 0 {
             state = .stopped

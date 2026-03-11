@@ -22,6 +22,41 @@ final class PiLaunchConfigurationTests: XCTestCase {
         )
     }
 
+    func testExtensionFingerprintReflectsFileContents() throws {
+        let fileManager = FileManager.default
+        let rootURL = try makeTemporaryDirectory()
+        defer { try? fileManager.removeItem(at: rootURL) }
+
+        let extensionURL = rootURL.appendingPathComponent("todo-app-tools.ts", isDirectory: false)
+        try "export default {}\n".write(to: extensionURL, atomically: true, encoding: .utf8)
+
+        let firstConfiguration = PiLaunchConfiguration(
+            workingDirectoryURL: rootURL,
+            extensionURL: extensionURL,
+            socketURL: rootURL.appendingPathComponent("todo.sock", isDirectory: false),
+            authToken: "token",
+            environment: ["PATH": "/usr/bin:/bin"],
+            homeDirectoryURL: rootURL,
+            fileManager: fileManager
+        )
+
+        try "export default { changed: true }\n".write(to: extensionURL, atomically: true, encoding: .utf8)
+
+        let secondConfiguration = PiLaunchConfiguration(
+            workingDirectoryURL: rootURL,
+            extensionURL: extensionURL,
+            socketURL: rootURL.appendingPathComponent("todo.sock", isDirectory: false),
+            authToken: "token",
+            environment: ["PATH": "/usr/bin:/bin"],
+            homeDirectoryURL: rootURL,
+            fileManager: fileManager
+        )
+
+        XCTAssertNotNil(firstConfiguration.extensionFingerprint)
+        XCTAssertNotNil(secondConfiguration.extensionFingerprint)
+        XCTAssertNotEqual(firstConfiguration.extensionFingerprint, secondConfiguration.extensionFingerprint)
+    }
+
     func testInitializerResolvesPiFromPATH() throws {
         let fileManager = FileManager.default
         let rootURL = try makeTemporaryDirectory()

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 struct PiLaunchConfiguration {
@@ -8,6 +9,7 @@ struct PiLaunchConfiguration {
     let piCommand: String
     let executableURL: URL?
     let validationError: String?
+    let extensionFingerprint: String?
 
     private let baseEnvironment: [String: String]
 
@@ -27,6 +29,7 @@ struct PiLaunchConfiguration {
         self.authToken = authToken
         self.piCommand = piCommand
         self.baseEnvironment = environment
+        self.extensionFingerprint = Self.extensionFingerprint(for: extensionURL)
 
         if let executableURL = Self.resolveExecutableURL(
             command: piCommand,
@@ -191,6 +194,15 @@ struct PiLaunchConfiguration {
                             .appendingPathComponent(command, isDirectory: false)
                     }
             }
+    }
+
+    private static func extensionFingerprint(for extensionURL: URL) -> String? {
+        guard let data = try? Data(contentsOf: extensionURL) else {
+            return nil
+        }
+
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private static func prependPathComponent(_ component: String, to existingPath: String?) -> String {
