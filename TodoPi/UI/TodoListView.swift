@@ -1,11 +1,17 @@
 import SwiftUI
 
 struct TodoListView: View {
+    private enum FocusedField: Hashable {
+        case listTitle
+        case todoBody
+    }
+
     @ObservedObject var viewModel: MainWindowViewModel
 
     @State private var editingTodoID: UUID?
     @State private var editingTodoTitle = ""
     @State private var pendingDeleteTodo: TodoItem?
+    @FocusState private var focusedField: FocusedField?
 
     var body: some View {
         Group {
@@ -32,6 +38,17 @@ struct TodoListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onChange(of: focusedField) { oldValue, newValue in
+            if oldValue == .listTitle, newValue != .listTitle {
+                viewModel.saveListTitle()
+            }
+            if oldValue == .todoBody, newValue != .todoBody {
+                viewModel.saveTodoBody()
+            }
+        }
+        .onDisappear {
+            viewModel.persistDraftsIfNeeded()
+        }
         .alert("Delete Todo?", isPresented: Binding(
             get: { pendingDeleteTodo != nil },
             set: { if !$0 { pendingDeleteTodo = nil } }
@@ -101,13 +118,10 @@ struct TodoListView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.title2)
                     .fontWeight(.semibold)
+                    .focused($focusedField, equals: .listTitle)
                     .onSubmit {
                         viewModel.saveListTitle()
                     }
-
-                Button("Save") {
-                    viewModel.saveListTitle()
-                }
 
                 Spacer()
 
@@ -150,22 +164,10 @@ struct TodoListView: View {
 
                 TextEditor(text: $viewModel.todoBodyDraft)
                     .font(.body)
+                    .focused($focusedField, equals: .todoBody)
                     .padding(8)
                     .background(Color.secondary.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                HStack {
-                    Button("Discard") {
-                        viewModel.discardTodoEdits()
-                    }
-
-                    Spacer()
-
-                    Button("Save Todo") {
-                        viewModel.saveTodoBody()
-                    }
-                    .keyboardShortcut(.return, modifiers: [.command])
-                }
             } else {
                 ContentUnavailableView(
                     "Select a todo",

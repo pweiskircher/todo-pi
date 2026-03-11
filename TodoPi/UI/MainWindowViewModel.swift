@@ -65,6 +65,8 @@ final class MainWindowViewModel: ObservableObject {
     }
 
     func selectList(id: UUID?) {
+        persistDraftsIfNeeded()
+
         guard let id else {
             selectedListID = nil
             selectedTodoID = nil
@@ -83,6 +85,8 @@ final class MainWindowViewModel: ObservableObject {
     }
 
     func selectTodo(id: UUID?) {
+        persistDraftsIfNeeded()
+
         guard let id else {
             selectedTodoID = nil
             syncEditorDrafts()
@@ -99,6 +103,8 @@ final class MainWindowViewModel: ObservableObject {
     }
 
     func createList() {
+        persistDraftsIfNeeded()
+
         do {
             let list = try commandService.createList(title: uniqueTitle(base: "New List", in: lists.map(\.title)))
             selectedListID = list.id
@@ -120,6 +126,8 @@ final class MainWindowViewModel: ObservableObject {
     }
 
     func createTodo() {
+        persistDraftsIfNeeded()
+
         guard let list = selectedList else {
             return
         }
@@ -155,6 +163,11 @@ final class MainWindowViewModel: ObservableObject {
             return
         }
 
+        let normalizedDraft = listTitleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedDraft.isEmpty, normalizedDraft != list.title else {
+            return
+        }
+
         renameList(id: list.id, title: listTitleDraft)
     }
 
@@ -169,6 +182,12 @@ final class MainWindowViewModel: ObservableObject {
 
     func saveTodoBody() {
         guard let list = selectedList, let todo = selectedTodo else {
+            return
+        }
+
+        let normalizedDraft = todoBodyDraft.replacingOccurrences(of: "\r\n", with: "\n")
+        let currentBody = Self.todoBodyText(from: todo).replacingOccurrences(of: "\r\n", with: "\n")
+        guard normalizedDraft != currentBody else {
             return
         }
 
@@ -196,6 +215,11 @@ final class MainWindowViewModel: ObservableObject {
         } catch {
             editorErrorDescription = error.localizedDescription
         }
+    }
+
+    func persistDraftsIfNeeded() {
+        saveListTitle()
+        saveTodoBody()
     }
 
     func discardTodoEdits() {
