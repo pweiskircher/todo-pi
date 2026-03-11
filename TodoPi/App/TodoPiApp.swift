@@ -15,6 +15,7 @@ struct TodoPiApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = TodoStore()
+    private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     private lazy var repository = JSONTodoRepository()
     private lazy var commandService = TodoCommandService(store: store, repository: repository)
 
@@ -67,6 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menuBarController = MenuBarController { [weak mainWindowController] in
             mainWindowController?.showWindow()
+        }
+
+        guard !isRunningTests else {
+            return
         }
 
         DispatchQueue.main.async { [weak mainWindowController] in
