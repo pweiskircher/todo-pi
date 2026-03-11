@@ -20,17 +20,15 @@ struct TodoListView: View {
                 VStack(spacing: 0) {
                     header(for: list)
 
-                    if let todo = viewModel.selectedTodo {
-                        Divider()
-
-                        todoDetailsCard(for: todo)
-                            .padding(16)
-                    }
-
                     Divider()
 
                     todoListSection(for: list)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    if let todo = viewModel.selectedTodo {
+                        todoDetailsSection(for: todo)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
             } else {
                 ContentUnavailableView(
@@ -52,6 +50,7 @@ struct TodoListView: View {
                 viewModel.saveTodoBody()
             }
         }
+        .animation(.spring(response: 0.24, dampingFraction: 0.9), value: viewModel.selectedTodoID)
         .onDisappear {
             viewModel.persistDraftsIfNeeded()
         }
@@ -152,6 +151,15 @@ struct TodoListView: View {
         .padding(16)
     }
 
+    private func todoDetailsSection(for todo: TodoItem) -> some View {
+        VStack(spacing: 0) {
+            Divider()
+
+            todoDetailsCard(for: todo)
+                .padding(16)
+        }
+    }
+
     private func todoDetailsCard(for todo: TodoItem) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
@@ -182,7 +190,7 @@ struct TodoListView: View {
                 .font(.body)
                 .scrollContentBackground(.hidden)
                 .focused($focusedField, equals: .todoNotes)
-                .frame(minHeight: 150)
+                .frame(minHeight: 120)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(Color(nsColor: .textBackgroundColor))
