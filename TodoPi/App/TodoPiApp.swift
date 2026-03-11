@@ -68,6 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarController = MenuBarController { [weak mainWindowController] in
             mainWindowController?.showWindow()
         }
+
+        DispatchQueue.main.async { [weak mainWindowController] in
+            mainWindowController?.showWindow()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
