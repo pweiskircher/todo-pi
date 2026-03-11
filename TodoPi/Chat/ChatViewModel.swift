@@ -34,6 +34,7 @@ final class ChatViewModel: ObservableObject {
     private let now: () -> Date
     private let makeID: () -> UUID
     private var activeMessageIDsByKey: [String: UUID] = [:]
+    private var lastCompletedMessageTextByKey: [String: String] = [:]
     private var cancellables: Set<AnyCancellable> = []
 
     init(
@@ -66,6 +67,7 @@ final class ChatViewModel: ObservableObject {
 
         appendMessage(role: .user, text: message)
         draftMessage = ""
+        lastCompletedMessageTextByKey.removeAll()
 
         guard let sessionManager else {
             appendMessage(role: .system, text: "pi integration is not connected yet.")
@@ -111,6 +113,13 @@ final class ChatViewModel: ObservableObject {
             return
         }
 
+        if !isComplete {
+            lastCompletedMessageTextByKey.removeValue(forKey: key)
+        } else if activeMessageIDsByKey[key] == nil,
+                  lastCompletedMessageTextByKey[key] == trimmedText {
+            return
+        }
+
         if let messageID = activeMessageIDsByKey[key],
            let index = messages.firstIndex(where: { $0.id == messageID }) {
             messages[index] = ChatMessage(
@@ -133,6 +142,7 @@ final class ChatViewModel: ObservableObject {
         }
 
         if isComplete {
+            lastCompletedMessageTextByKey[key] = trimmedText
             clearActiveMessage(key: key)
         }
     }

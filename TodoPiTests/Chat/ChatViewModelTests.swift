@@ -84,6 +84,34 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.messages[2].text, "finished tool: createTodo")
     }
 
+    func testDuplicateAssistantCompletionIsIgnored() async {
+        let timestamp = Date(timeIntervalSince1970: 1_731_000_000)
+        let ids = IDSequence([
+            UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        ])
+        let sessionManager = FakePiSessionManager()
+        sessionManager.sendPromptHandler = { _, events in
+            events.send(.assistantMessageChanged("Hi! How can I help?"))
+            events.send(.assistantMessageCompleted("Hi! How can I help?"))
+            events.send(.assistantMessageCompleted("Hi! How can I help?"))
+        }
+        let viewModel = ChatViewModel(
+            sessionManager: sessionManager,
+            now: { timestamp },
+            makeID: { ids.next() }
+        )
+        viewModel.draftMessage = "hi"
+
+        viewModel.sendDraft()
+        await settleTasks()
+
+        XCTAssertEqual(viewModel.messages.count, 2)
+        XCTAssertEqual(viewModel.messages[0].role, .user)
+        XCTAssertEqual(viewModel.messages[1].role, .assistant)
+        XCTAssertEqual(viewModel.messages[1].text, "Hi! How can I help?")
+    }
+
     func testSendDraftAppendsSystemErrorWhenPromptFails() async {
         let sessionManager = FakePiSessionManager()
         sessionManager.sendPromptError = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "prompt failed"])

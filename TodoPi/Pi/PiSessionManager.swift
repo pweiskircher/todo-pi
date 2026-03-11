@@ -55,6 +55,8 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     private var stderrText = ""
     private var streamedAssistantText = ""
     private var streamedThinkingText = ""
+    private var didFinalizeAssistantMessageForCurrentTurn = false
+    private var didFinalizeThinkingMessageForCurrentTurn = false
     private var activeToolCallKey: String?
     private var activeToolCallName = "unknown"
     private var activeToolCallArguments = ""
@@ -205,6 +207,8 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     private func resetStreamingState() {
         streamedAssistantText = ""
         streamedThinkingText = ""
+        didFinalizeAssistantMessageForCurrentTurn = false
+        didFinalizeThinkingMessageForCurrentTurn = false
         activeToolCallKey = nil
         activeToolCallName = "unknown"
         activeToolCallArguments = ""
@@ -263,11 +267,12 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             switch event {
             case .agentStart:
                 state = .busy
+                resetTurnCompletionState()
                 emitSystemNotice("pi is working…")
             case .agentEnd:
                 state = .ready
             case .turnStart:
-                break
+                resetTurnCompletionState()
             case let .turnEnd(role, text):
                 if role == "assistant" {
                     finalizeAssistantMessage(fallbackText: text)
@@ -275,6 +280,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
                 finalizeThinkingMessage()
             case let .messageStart(role):
                 if role == "assistant" {
+                    didFinalizeAssistantMessageForCurrentTurn = false
                     emitSystemNotice("pi is drafting a response…")
                 }
             case let .messageUpdate(update):
@@ -299,11 +305,17 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
         }
     }
 
+    private func resetTurnCompletionState() {
+        didFinalizeAssistantMessageForCurrentTurn = false
+        didFinalizeThinkingMessageForCurrentTurn = false
+    }
+
     private func handleAssistantMessageUpdate(_ event: PiAssistantMessageEvent) {
         switch event {
         case .start:
             streamedAssistantText = ""
             streamedThinkingText = ""
+            resetTurnCompletionState()
         case let .textDelta(delta):
             streamedAssistantText += delta
             eventSubject.send(.assistantMessageChanged(streamedAssistantText))
@@ -314,6 +326,7 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             }
         case .thinkingStart:
             streamedThinkingText = ""
+            didFinalizeThinkingMessageForCurrentTurn = false
         case let .thinkingDelta(delta):
             streamedThinkingText += delta
             eventSubject.send(.thinkingChanged(streamedThinkingText))
@@ -361,6 +374,10 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
     }
 
     private func finalizeAssistantMessage(fallbackText: String?) {
+        guard !didFinalizeAssistantMessageForCurrentTurn else {
+            return
+        }
+
         let finalText: String?
         if !streamedAssistantText.isEmpty {
             finalText = streamedAssistantText
@@ -369,21 +386,29 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             finalText = (trimmedFallback?.isEmpty == false) ? trimmedFallback : nil
         }
 
-        if let finalText {
-            eventSubject.send(.assistantMessageCompleted(finalText))
-            lastNotice = nil
+        guard let finalText else {
+            streamedAssistantText = ""
+            return
         }
 
+        didFinalizeAssistantMessageForCurrentTurn = true
+        eventSubject.send(.assistantMessageCompleted(finalText))
+        lastNotice = nil
         streamedAssistantText = ""
     }
 
     private func finalizeThinkingMessage() {
+        guard !didFinalizeThinkingMessageForCurrentTurn else {
+            return
+        }
+
         let trimmedText = streamedThinkingText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else {
             streamedThinkingText = ""
             return
         }
 
+        didFinalizeThinkingMessageForCurrentTurn = true
         eventSubject.send(.thinkingCompleted(trimmedText))
         streamedThinkingText = ""
     }
