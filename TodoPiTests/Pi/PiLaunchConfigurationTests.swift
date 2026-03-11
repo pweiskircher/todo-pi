@@ -38,17 +38,7 @@ final class PiLaunchConfigurationTests: XCTestCase {
         let homeURL = try makeTemporaryDirectory()
         defer { try? fileManager.removeItem(at: homeURL) }
 
-        let piURL = homeURL
-            .appendingPathComponent(".local", isDirectory: true)
-            .appendingPathComponent("share", isDirectory: true)
-            .appendingPathComponent("mise", isDirectory: true)
-            .appendingPathComponent("installs", isDirectory: true)
-            .appendingPathComponent("node", isDirectory: true)
-            .appendingPathComponent("23.3.0", isDirectory: true)
-            .appendingPathComponent("bin", isDirectory: true)
-            .appendingPathComponent("pi", isDirectory: false)
-        try fileManager.createDirectory(at: piURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try makeExecutable(at: piURL)
+        let piURL = try makeMiseInstalledPi(at: homeURL)
 
         let configuration = PiLaunchConfiguration(
             workingDirectoryURL: homeURL,
@@ -63,6 +53,60 @@ final class PiLaunchConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.executableURL?.path, piURL.path)
         XCTAssertNil(configuration.validationError)
         XCTAssertTrue(configuration.environment["PATH"]?.contains(piURL.deletingLastPathComponent().path) == true)
+    }
+
+    func testInitializerPrefersRealMiseInstallOverAsdfShimInPATH() throws {
+        let fileManager = FileManager.default
+        let homeURL = try makeTemporaryDirectory()
+        defer { try? fileManager.removeItem(at: homeURL) }
+
+        let shimURL = homeURL
+            .appendingPathComponent(".asdf", isDirectory: true)
+            .appendingPathComponent("shims", isDirectory: true)
+            .appendingPathComponent("pi", isDirectory: false)
+        try fileManager.createDirectory(at: shimURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try makeExecutable(at: shimURL)
+
+        let piURL = try makeMiseInstalledPi(at: homeURL)
+
+        let configuration = PiLaunchConfiguration(
+            workingDirectoryURL: homeURL,
+            extensionURL: homeURL.appendingPathComponent("todo-app-tools.ts", isDirectory: false),
+            socketURL: homeURL.appendingPathComponent("todo.sock", isDirectory: false),
+            authToken: "token",
+            environment: ["PATH": shimURL.deletingLastPathComponent().path],
+            homeDirectoryURL: homeURL,
+            fileManager: fileManager
+        )
+
+        XCTAssertEqual(configuration.executableURL?.path, piURL.path)
+        XCTAssertNil(configuration.validationError)
+    }
+
+    func testInitializerRejectsShimOnlyResolution() throws {
+        let fileManager = FileManager.default
+        let homeURL = try makeTemporaryDirectory()
+        defer { try? fileManager.removeItem(at: homeURL) }
+
+        let shimURL = homeURL
+            .appendingPathComponent(".asdf", isDirectory: true)
+            .appendingPathComponent("shims", isDirectory: true)
+            .appendingPathComponent("pi", isDirectory: false)
+        try fileManager.createDirectory(at: shimURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try makeExecutable(at: shimURL)
+
+        let configuration = PiLaunchConfiguration(
+            workingDirectoryURL: homeURL,
+            extensionURL: homeURL.appendingPathComponent("todo-app-tools.ts", isDirectory: false),
+            socketURL: homeURL.appendingPathComponent("todo.sock", isDirectory: false),
+            authToken: "token",
+            environment: ["PATH": shimURL.deletingLastPathComponent().path],
+            homeDirectoryURL: homeURL,
+            fileManager: fileManager
+        )
+
+        XCTAssertNil(configuration.executableURL)
+        XCTAssertNotNil(configuration.validationError)
     }
 
     func testInitializerReportsHelpfulErrorWhenPiCannotBeFound() throws {
@@ -98,6 +142,21 @@ final class PiLaunchConfigurationTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         return rootURL
+    }
+
+    private func makeMiseInstalledPi(at homeURL: URL) throws -> URL {
+        let piURL = homeURL
+            .appendingPathComponent(".local", isDirectory: true)
+            .appendingPathComponent("share", isDirectory: true)
+            .appendingPathComponent("mise", isDirectory: true)
+            .appendingPathComponent("installs", isDirectory: true)
+            .appendingPathComponent("node", isDirectory: true)
+            .appendingPathComponent("23.3.0", isDirectory: true)
+            .appendingPathComponent("bin", isDirectory: true)
+            .appendingPathComponent("pi", isDirectory: false)
+        try FileManager.default.createDirectory(at: piURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try makeExecutable(at: piURL)
+        return piURL
     }
 
     private func makeExecutable(at url: URL) throws {

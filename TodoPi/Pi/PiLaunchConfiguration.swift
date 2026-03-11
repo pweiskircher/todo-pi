@@ -95,7 +95,10 @@ struct PiLaunchConfiguration {
         let expandedCommand = NSString(string: command).expandingTildeInPath
         if expandedCommand.contains("/") {
             let url = URL(fileURLWithPath: expandedCommand).standardizedFileURL
-            return fileManager.isExecutableFile(atPath: url.path) ? url : nil
+            guard fileManager.isExecutableFile(atPath: url.path), !isShimURL(url, homeDirectoryURL: homeDirectoryURL) else {
+                return nil
+            }
+            return url
         }
 
         var candidates: [URL] = []
@@ -117,8 +120,8 @@ struct PiLaunchConfiguration {
 
         [
             homeDirectoryURL.appendingPathComponent(".local/bin", isDirectory: true).appendingPathComponent(command, isDirectory: false),
-            homeDirectoryURL.appendingPathComponent(".asdf/shims", isDirectory: true).appendingPathComponent(command, isDirectory: false),
             homeDirectoryURL.appendingPathComponent(".local/share/mise/shims", isDirectory: true).appendingPathComponent(command, isDirectory: false),
+            homeDirectoryURL.appendingPathComponent(".asdf/shims", isDirectory: true).appendingPathComponent(command, isDirectory: false),
             URL(fileURLWithPath: "/opt/homebrew/bin", isDirectory: true).appendingPathComponent(command, isDirectory: false),
             URL(fileURLWithPath: "/usr/local/bin", isDirectory: true).appendingPathComponent(command, isDirectory: false)
         ].forEach(appendCandidate)
@@ -126,7 +129,19 @@ struct PiLaunchConfiguration {
         miseInstallCandidates(command: command, homeDirectoryURL: homeDirectoryURL, fileManager: fileManager)
             .forEach(appendCandidate)
 
-        return candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
+        return candidates.first {
+            fileManager.isExecutableFile(atPath: $0.path) && !isShimURL($0, homeDirectoryURL: homeDirectoryURL)
+        }
+    }
+
+    private static func isShimURL(_ url: URL, homeDirectoryURL: URL) -> Bool {
+        let path = url.standardizedFileURL.path
+        let knownShimDirectories = [
+            homeDirectoryURL.appendingPathComponent(".asdf/shims", isDirectory: true).path,
+            homeDirectoryURL.appendingPathComponent(".local/share/mise/shims", isDirectory: true).path
+        ]
+
+        return knownShimDirectories.contains(where: { path.hasPrefix($0 + "/") || path == $0 })
     }
 
     private static func miseInstallCandidates(
@@ -144,8 +159,7 @@ struct PiLaunchConfiguration {
             at: installsURL,
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
-        )
-        else {
+        ) else {
             return []
         }
 
@@ -156,8 +170,7 @@ struct PiLaunchConfiguration {
                     at: toolURL,
                     includingPropertiesForKeys: nil,
                     options: [.skipsHiddenFiles]
-                )
-                else {
+                ) else {
                     return []
                 }
 

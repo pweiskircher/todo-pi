@@ -27,6 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store: store,
         commandService: commandService
     )
+    // TODO(Settings): Add a user-configurable pi executable path override.
+    // Finder-launched apps do not reliably inherit the same PATH as Terminal,
+    // so long-term we should let users point TodoPi at their preferred pi binary.
     private lazy var launchConfiguration = PiLaunchConfiguration.defaultExtensionURL().map {
         PiLaunchConfiguration(
             workingDirectoryURL: URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
