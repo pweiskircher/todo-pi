@@ -103,6 +103,22 @@ final class MainWindowViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedList?.todos.map(\.sortOrder), [0, 1])
     }
 
+    func testDraftEditsAutosaveAfterDebounce() async throws {
+        let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
+        let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
+        let store = TodoStore(document: TodoDocument.empty().withLists([list]))
+        let viewModel = makeViewModel(store: store)
+
+        viewModel.listTitleDraft = "Personal"
+        viewModel.todoBodyDraft = "Buy oat milk\n\n2 cartons"
+
+        try await Task.sleep(for: .milliseconds(400))
+
+        XCTAssertEqual(viewModel.selectedList?.title, "Personal")
+        XCTAssertEqual(viewModel.selectedTodo?.title, "Buy oat milk")
+        XCTAssertEqual(viewModel.selectedTodo?.notes, "2 cartons")
+    }
+
     private func makeViewModel(store: TodoStore) -> MainWindowViewModel {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

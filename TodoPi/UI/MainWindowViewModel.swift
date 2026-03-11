@@ -14,6 +14,9 @@ final class MainWindowViewModel: ObservableObject {
 
     private let commandService: TodoCommandService
     private var cancellables: Set<AnyCancellable> = []
+    private var isSyncingDrafts = false
+    private var lastDraftedListID: UUID?
+    private var lastDraftedTodoID: UUID?
 
     init(
         store: TodoStore,
@@ -38,6 +41,24 @@ final class MainWindowViewModel: ObservableObject {
             .sink { [weak self] lists in
                 self?.syncSelection(with: lists)
                 self?.syncEditorDrafts()
+            }
+            .store(in: &cancellables)
+
+        $listTitleDraft
+            .dropFirst()
+            .removeDuplicates()
+            .debounce(for: .milliseconds(250), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.autosaveListTitleIfNeeded()
+            }
+            .store(in: &cancellables)
+
+        $todoBodyDraft
+            .dropFirst()
+            .removeDuplicates()
+            .debounce(for: .milliseconds(250), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.autosaveTodoBodyIfNeeded()
             }
             .store(in: &cancellables)
     }
@@ -290,8 +311,30 @@ final class MainWindowViewModel: ObservableObject {
     }
 
     private func syncEditorDrafts() {
-        listTitleDraft = selectedList?.title ?? ""
-        todoBodyDraft = selectedTodo.map(Self.todoBodyText(from:)) ?? ""
+        isSyncingDrafts = true
+
+        if let selectedList {
+            if lastDraftedListID != selectedList.id || listTitleDraft == selectedList.title {
+                listTitleDraft = selectedList.title
+                lastDraftedListID = selectedList.id
+            }
+        } else {
+            listTitleDraft = ""
+            lastDraftedListID = nil
+        }
+
+        if let selectedTodo {
+            let bodyText = Self.todoBodyText(from: selectedTodo)
+            if lastDraftedTodoID != selectedTodo.id || todoBodyDraft == bodyText {
+                todoBodyDraft = bodyText
+                lastDraftedTodoID = selectedTodo.id
+            }
+        } else {
+            todoBodyDraft = ""
+            lastDraftedTodoID = nil
+        }
+
+        isSyncingDrafts = false
     }
 
     private func parseTodoBody(_ body: String) -> TodoUpdateRequest {
@@ -312,6 +355,20 @@ final class MainWindowViewModel: ObservableObject {
             title: title,
             notes: trimmedNotes.isEmpty ? .clear : .set(notesText)
         )
+    }
+
+    private func autosaveListTitleIfNeeded() {
+        guard !isSyncingDrafts else {
+            return
+        }
+        saveListTitle()
+    }
+
+    private func autosaveTodoBodyIfNeeded() {
+        guard !isSyncingDrafts else {
+            return
+        }
+        saveTodoBody()
     }
 
     private func uniqueTitle(base: String, in existingTitles: [String]) -> String {
