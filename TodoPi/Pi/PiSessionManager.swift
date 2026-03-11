@@ -268,7 +268,6 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             case .agentStart:
                 state = .busy
                 resetTurnCompletionState()
-                emitSystemNotice("pi is working…")
             case .agentEnd:
                 state = .ready
             case .turnStart:
@@ -281,7 +280,6 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
             case let .messageStart(role):
                 if role == "assistant" {
                     didFinalizeAssistantMessageForCurrentTurn = false
-                    emitSystemNotice("pi is drafting a response…")
                 }
             case let .messageUpdate(update):
                 handleAssistantMessageUpdate(update)
