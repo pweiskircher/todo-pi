@@ -49,8 +49,7 @@ struct ChatPanelView: View {
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
 
-                            Text(message.text)
-                                .font(messageFont(for: message.role))
+                            messageBody(for: message)
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -104,12 +103,20 @@ struct ChatPanelView: View {
         }
     }
 
-    private func messageFont(for role: ChatMessage.Role) -> Font {
-        switch role {
+    @ViewBuilder
+    private func messageBody(for message: ChatMessage) -> some View {
+        switch message.role {
+        case .assistant, .user:
+            if let markdown = try? AttributedString(markdown: message.text) {
+                Text(markdown)
+                    .font(.body)
+            } else {
+                Text(message.text)
+                    .font(.body)
+            }
         case .thinking, .tool, .system:
-            return .system(.body, design: .monospaced)
-        case .user, .assistant:
-            return .body
+            Text(message.text)
+                .font(.system(.body, design: .monospaced))
         }
     }
 
