@@ -84,6 +84,17 @@ final class PiSessionManager: ObservableObject {
         stderrText = ""
         stdoutFramer = PiJSONLFramer()
 
+        if let validationError = launchConfiguration.validationError {
+            state = .failed(validationError)
+            throw NSError(domain: "TodoPi.PiSessionManager", code: 4, userInfo: [NSLocalizedDescriptionKey: validationError])
+        }
+
+        guard let executableURL = launchConfiguration.executableURL else {
+            let message = "pi executable is unavailable"
+            state = .failed(message)
+            throw NSError(domain: "TodoPi.PiSessionManager", code: 5, userInfo: [NSLocalizedDescriptionKey: message])
+        }
+
         do {
             try bridgeServer.start()
         } catch {
@@ -95,7 +106,7 @@ final class PiSessionManager: ObservableObject {
         let stdinPipe = Pipe()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
-        process.executableURL = launchConfiguration.executableURL
+        process.executableURL = executableURL
         process.arguments = launchConfiguration.arguments
         process.currentDirectoryURL = launchConfiguration.workingDirectoryURL
         process.environment = launchConfiguration.environment

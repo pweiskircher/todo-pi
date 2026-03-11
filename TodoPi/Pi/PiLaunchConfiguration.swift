@@ -6,28 +6,47 @@ struct PiLaunchConfiguration {
     let socketURL: URL
     let authToken: String
     let piCommand: String
+    let executableURL: URL?
+    let validationError: String?
+
+    private let baseEnvironment: [String: String]
 
     init(
         workingDirectoryURL: URL,
         extensionURL: URL,
         socketURL: URL,
         authToken: String,
-        piCommand: String = "pi"
+        piCommand: String = "pi",
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
+        fileManager: FileManager = .default
     ) {
         self.workingDirectoryURL = workingDirectoryURL
         self.extensionURL = extensionURL
         self.socketURL = socketURL
         self.authToken = authToken
         self.piCommand = piCommand
-    }
+        self.baseEnvironment = environment
 
-    var executableURL: URL {
-        URL(fileURLWithPath: "/usr/bin/env")
+        if let executableURL = Self.resolveExecutableURL(
+            command: piCommand,
+            environment: environment,
+            homeDirectoryURL: homeDirectoryURL,
+            fileManager: fileManager
+        ) {
+            self.executableURL = executableURL
+            self.validationError = nil
+        } else {
+            self.executableURL = nil
+            self.validationError = Self.missingExecutableErrorDescription(
+                command: piCommand,
+                homeDirectoryURL: homeDirectoryURL
+            )
+        }
     }
 
     var arguments: [String] {
         [
-            piCommand,
             "--mode", "rpc",
             "--no-session",
             "--no-tools",
@@ -36,7 +55,13 @@ struct PiLaunchConfiguration {
     }
 
     var environment: [String: String] {
-        var environment = ProcessInfo.processInfo.environment
+        var environment = baseEnvironment
+        if let executableURL {
+            environment["PATH"] = Self.prependPathComponent(
+                executableURL.deletingLastPathComponent().path,
+                to: environment["PATH"]
+            )
+        }
         environment["TODO_PI_SOCKET"] = socketURL.path
         environment["TODO_PI_TOKEN"] = authToken
         return environment
@@ -59,5 +84,113 @@ struct PiLaunchConfiguration {
         }
 
         return nil
+    }
+
+    private static func resolveExecutableURL(
+        command: String,
+        environment: [String: String],
+        homeDirectoryURL: URL,
+        fileManager: FileManager
+    ) -> URL? {
+        let expandedCommand = NSString(string: command).expandingTildeInPath
+        if expandedCommand.contains("/") {
+            let url = URL(fileURLWithPath: expandedCommand).standardizedFileURL
+            return fileManager.isExecutableFile(atPath: url.path) ? url : nil
+        }
+
+        var candidates: [URL] = []
+        var seenPaths: Set<String> = []
+
+        func appendCandidate(_ url: URL) {
+            let path = url.standardizedFileURL.path
+            guard seenPaths.insert(path).inserted else { return }
+            candidates.append(URL(fileURLWithPath: path))
+        }
+
+        environment["PATH"]?
+            .split(separator: ":")
+            .map(String.init)
+            .filter { !$0.isEmpty }
+            .forEach { directory in
+                appendCandidate(URL(fileURLWithPath: directory, isDirectory: true).appendingPathComponent(command, isDirectory: false))
+            }
+
+        [
+            homeDirectoryURL.appendingPathComponent(".local/bin", isDirectory: true).appendingPathComponent(command, isDirectory: false),
+            homeDirectoryURL.appendingPathComponent(".asdf/shims", isDirectory: true).appendingPathComponent(command, isDirectory: false),
+            homeDirectoryURL.appendingPathComponent(".local/share/mise/shims", isDirectory: true).appendingPathComponent(command, isDirectory: false),
+            URL(fileURLWithPath: "/opt/homebrew/bin", isDirectory: true).appendingPathComponent(command, isDirectory: false),
+            URL(fileURLWithPath: "/usr/local/bin", isDirectory: true).appendingPathComponent(command, isDirectory: false)
+        ].forEach(appendCandidate)
+
+        miseInstallCandidates(command: command, homeDirectoryURL: homeDirectoryURL, fileManager: fileManager)
+            .forEach(appendCandidate)
+
+        return candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
+    }
+
+    private static func miseInstallCandidates(
+        command: String,
+        homeDirectoryURL: URL,
+        fileManager: FileManager
+    ) -> [URL] {
+        let installsURL = homeDirectoryURL
+            .appendingPathComponent(".local", isDirectory: true)
+            .appendingPathComponent("share", isDirectory: true)
+            .appendingPathComponent("mise", isDirectory: true)
+            .appendingPathComponent("installs", isDirectory: true)
+
+        guard let toolURLs = try? fileManager.contentsOfDirectory(
+            at: installsURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+        else {
+            return []
+        }
+
+        return toolURLs
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .flatMap { toolURL -> [URL] in
+                guard let versionURLs = try? fileManager.contentsOfDirectory(
+                    at: toolURL,
+                    includingPropertiesForKeys: nil,
+                    options: [.skipsHiddenFiles]
+                )
+                else {
+                    return []
+                }
+
+                return versionURLs
+                    .sorted { $0.lastPathComponent > $1.lastPathComponent }
+                    .map {
+                        $0.appendingPathComponent("bin", isDirectory: true)
+                            .appendingPathComponent(command, isDirectory: false)
+                    }
+            }
+    }
+
+    private static func prependPathComponent(_ component: String, to existingPath: String?) -> String {
+        guard let existingPath, !existingPath.isEmpty else {
+            return component
+        }
+
+        let segments = existingPath.split(separator: ":").map(String.init)
+        if segments.contains(component) {
+            return existingPath
+        }
+
+        return ([component] + segments).joined(separator: ":")
+    }
+
+    private static func missingExecutableErrorDescription(command: String, homeDirectoryURL: URL) -> String {
+        let miseInstallsPath = homeDirectoryURL
+            .appendingPathComponent(".local", isDirectory: true)
+            .appendingPathComponent("share", isDirectory: true)
+            .appendingPathComponent("mise", isDirectory: true)
+            .appendingPathComponent("installs", isDirectory: true)
+            .path
+
+        return "Could not find \(command). GUI apps do not always inherit your shell PATH. Checked PATH and common install locations, including \(miseInstallsPath)."
     }
 }
