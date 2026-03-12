@@ -124,7 +124,6 @@ final class PiSessionManager: ObservableObject, PiSessionManaging {
 
         process = nil
         stdinHandle = nil
-        bridgeServer.stop()
         failPendingResponses(with: CancellationError())
         resetStreamingState()
         activeExtensionFingerprint = nil

@@ -1,6 +1,14 @@
 import CryptoKit
 import Foundation
 
+struct TodoPiBridgeRuntimeInfo: Codable, Equatable {
+    let version: Int
+    let socketPath: String
+    let token: String
+    let processIdentifier: Int32
+    let updatedAt: Date
+}
+
 struct PiLaunchConfiguration {
     let workingDirectoryURL: URL
     let configDirectoryURL: URL?
@@ -117,6 +125,16 @@ struct PiLaunchConfiguration {
         return baseURL
             .appendingPathComponent("TodoPi", isDirectory: true)
             .appendingPathComponent("pi-agent", isDirectory: true)
+    }
+
+    static func defaultBridgeRuntimeInfoURL(
+        fileManager: FileManager = .default,
+        applicationSupportURL: URL? = nil
+    ) -> URL {
+        let baseURL = applicationSupportURL ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return baseURL
+            .appendingPathComponent("TodoPi", isDirectory: true)
+            .appendingPathComponent("bridge-runtime.json", isDirectory: false)
     }
 
     private static func resolveExecutableURL(

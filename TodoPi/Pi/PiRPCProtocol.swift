@@ -76,6 +76,11 @@ enum JSONValue: Codable, Equatable {
         return Int(exactly: value)
     }
 
+    var boolValue: Bool? {
+        guard case let .bool(value) = self else { return nil }
+        return value
+    }
+
     var objectValue: [String: JSONValue]? {
         guard case let .object(value) = self else { return nil }
         return value

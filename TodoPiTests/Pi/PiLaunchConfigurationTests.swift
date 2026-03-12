@@ -42,6 +42,26 @@ final class PiLaunchConfigurationTests: XCTestCase {
         )
     }
 
+    func testDefaultBridgeRuntimeInfoURLUsesApplicationSupportSubdirectory() throws {
+        let fileManager = FileManager.default
+        let rootURL = try makeTemporaryDirectory()
+        defer { try? fileManager.removeItem(at: rootURL) }
+
+        let applicationSupportURL = rootURL.appendingPathComponent("Application Support", isDirectory: true)
+        let runtimeInfoURL = PiLaunchConfiguration.defaultBridgeRuntimeInfoURL(
+            fileManager: fileManager,
+            applicationSupportURL: applicationSupportURL
+        )
+
+        XCTAssertEqual(
+            runtimeInfoURL.path,
+            applicationSupportURL
+                .appendingPathComponent("TodoPi", isDirectory: true)
+                .appendingPathComponent("bridge-runtime.json", isDirectory: false)
+                .path
+        )
+    }
+
     func testExtensionFingerprintReflectsFileContents() throws {
         let fileManager = FileManager.default
         let rootURL = try makeTemporaryDirectory()

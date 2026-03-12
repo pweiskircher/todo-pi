@@ -87,6 +87,10 @@ final class PiBridgeServer {
     }
 
     func start() throws {
+        if acceptSource != nil, socketFD != -1 {
+            return
+        }
+
         stop()
         PiDebugLog.write("Starting bridge server at \(socketURL.path)")
 
@@ -293,6 +297,15 @@ final class PiBridgeServer {
                 let title = try stringArgument(named: "title", from: request.arguments)
                 let list = try commandService.createList(title: title)
                 return .success(try jsonValue(from: list))
+            case "updateListTitle":
+                let listID = try uuidArgument(named: "listId", from: request.arguments)
+                let title = try stringArgument(named: "title", from: request.arguments)
+                let list = try commandService.updateListTitle(listID: listID, title: title)
+                return .success(try jsonValue(from: list))
+            case "deleteList":
+                let listID = try uuidArgument(named: "listId", from: request.arguments)
+                try commandService.deleteList(listID: listID)
+                return .success(.object(["deletedListId": .string(listID.uuidString)]))
             case "createTodo":
                 let listID = try uuidArgument(named: "listId", from: request.arguments)
                 let title = try stringArgument(named: "title", from: request.arguments)
@@ -313,6 +326,17 @@ final class PiBridgeServer {
                 let todoID = try uuidArgument(named: "todoId", from: request.arguments)
                 let todo = try commandService.completeTodo(in: listID, todoID: todoID)
                 return .success(try jsonValue(from: todo))
+            case "setTodoCompletion":
+                let listID = try uuidArgument(named: "listId", from: request.arguments)
+                let todoID = try uuidArgument(named: "todoId", from: request.arguments)
+                let isCompleted = try boolArgument(named: "isCompleted", from: request.arguments)
+                let todo = try commandService.setTodoCompletion(in: listID, todoID: todoID, isCompleted: isCompleted)
+                return .success(try jsonValue(from: todo))
+            case "deleteTodo":
+                let listID = try uuidArgument(named: "listId", from: request.arguments)
+                let todoID = try uuidArgument(named: "todoId", from: request.arguments)
+                try commandService.deleteTodo(in: listID, todoID: todoID)
+                return .success(.object(["deletedTodoId": .string(todoID.uuidString)]))
             case "moveTodo":
                 let listID = try uuidArgument(named: "listId", from: request.arguments)
                 let todoID = try uuidArgument(named: "todoId", from: request.arguments)
@@ -347,6 +371,13 @@ final class PiBridgeServer {
     private static func intArgument(named name: String, from arguments: [String: JSONValue]) throws -> Int {
         guard let value = arguments[name]?.intValue else {
             throw NSError(domain: "TodoPi.PiBridgeServer", code: 3, userInfo: [NSLocalizedDescriptionKey: "Missing integer argument: \(name)"])
+        }
+        return value
+    }
+
+    private static func boolArgument(named name: String, from arguments: [String: JSONValue]) throws -> Bool {
+        guard let value = arguments[name]?.boolValue else {
+            throw NSError(domain: "TodoPi.PiBridgeServer", code: 4, userInfo: [NSLocalizedDescriptionKey: "Missing boolean argument: \(name)"])
         }
         return value
     }

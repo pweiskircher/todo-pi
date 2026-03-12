@@ -80,6 +80,71 @@ final class PiBridgeServerTests: XCTestCase {
         XCTAssertEqual(store.document.lists.first?.title, "Inbox")
     }
 
+    func testProcessRequestDataDispatchesSetTodoCompletion() throws {
+        let timestamp = Date(timeIntervalSince1970: 1_731_000_000)
+        let listID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let todoID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let todo = TodoItem(
+            id: todoID,
+            title: "Buy milk",
+            notes: nil,
+            isCompleted: false,
+            sortOrder: 0,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            completedAt: nil
+        )
+        let list = TodoList(id: listID, title: "Inbox", todos: [todo], createdAt: timestamp, updatedAt: timestamp)
+        let store = TodoStore(document: TodoDocument(schemaVersion: 1, lists: [list], createdAt: timestamp, updatedAt: timestamp))
+        let repository = JSONTodoRepository(fileURL: tempDirectory().appending(path: "todos.json"))
+        let commandService = TodoCommandService(store: store, repository: repository, now: { timestamp.addingTimeInterval(10) })
+        let server = PiBridgeServer(
+            socketURL: tempSocketURL(),
+            authToken: "secret",
+            store: store,
+            commandService: commandService
+        )
+
+        let request = PiBridgeRequest(
+            token: "secret",
+            tool: "setTodoCompletion",
+            arguments: [
+                "listId": .string(listID.uuidString),
+                "todoId": .string(todoID.uuidString),
+                "isCompleted": .bool(true)
+            ]
+        )
+        let response = try decode(server.processRequestData(try JSONEncoder().encode(request)))
+
+        XCTAssertTrue(response.isSuccess)
+        XCTAssertEqual(store.document.lists.first?.todos.first?.isCompleted, true)
+    }
+
+    func testProcessRequestDataDispatchesDeleteList() throws {
+        let timestamp = Date(timeIntervalSince1970: 1_731_000_000)
+        let listID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let list = TodoList(id: listID, title: "Inbox", todos: [], createdAt: timestamp, updatedAt: timestamp)
+        let store = TodoStore(document: TodoDocument(schemaVersion: 1, lists: [list], createdAt: timestamp, updatedAt: timestamp))
+        let repository = JSONTodoRepository(fileURL: tempDirectory().appending(path: "todos.json"))
+        let commandService = TodoCommandService(store: store, repository: repository, now: { timestamp.addingTimeInterval(5) })
+        let server = PiBridgeServer(
+            socketURL: tempSocketURL(),
+            authToken: "secret",
+            store: store,
+            commandService: commandService
+        )
+
+        let request = PiBridgeRequest(
+            token: "secret",
+            tool: "deleteList",
+            arguments: ["listId": .string(listID.uuidString)]
+        )
+        let response = try decode(server.processRequestData(try JSONEncoder().encode(request)))
+
+        XCTAssertTrue(response.isSuccess)
+        XCTAssertTrue(store.document.lists.isEmpty)
+    }
+
     private func decode(_ data: Data) throws -> PiBridgeResponse {
         let trimmed = data.last == 0x0A ? data.dropLast() : data[...]
         return try JSONDecoder().decode(PiBridgeResponse.self, from: Data(trimmed))

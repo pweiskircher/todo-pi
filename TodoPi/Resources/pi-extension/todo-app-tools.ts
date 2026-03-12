@@ -168,6 +168,25 @@ export default function (pi: ExtensionAPI) {
   });
 
   registerBridgeTool(pi, {
+    name: "updateListTitle",
+    label: "Update List Title",
+    description: "Rename an existing todo list.",
+    parameters: Type.Object({
+      listId: Type.String({ description: "UUID of the todo list" }),
+      title: Type.String({ description: "Updated title for the list" }),
+    }),
+  });
+
+  registerBridgeTool(pi, {
+    name: "deleteList",
+    label: "Delete List",
+    description: "Delete a todo list and all of its todos.",
+    parameters: Type.Object({
+      listId: Type.String({ description: "UUID of the todo list" }),
+    }),
+  });
+
+  registerBridgeTool(pi, {
     name: "createTodo",
     label: "Create Todo",
     description: "Create a todo in a list.",
@@ -194,6 +213,27 @@ export default function (pi: ExtensionAPI) {
     name: "completeTodo",
     label: "Complete Todo",
     description: "Mark a todo as completed.",
+    parameters: Type.Object({
+      listId: Type.String({ description: "UUID of the todo list" }),
+      todoId: Type.String({ description: "UUID of the todo item" }),
+    }),
+  });
+
+  registerBridgeTool(pi, {
+    name: "setTodoCompletion",
+    label: "Set Todo Completion",
+    description: "Mark a todo as completed or incomplete.",
+    parameters: Type.Object({
+      listId: Type.String({ description: "UUID of the todo list" }),
+      todoId: Type.String({ description: "UUID of the todo item" }),
+      isCompleted: Type.Boolean({ description: "Whether the todo should be completed" }),
+    }),
+  });
+
+  registerBridgeTool(pi, {
+    name: "deleteTodo",
+    label: "Delete Todo",
+    description: "Delete a todo from a list.",
     parameters: Type.Object({
       listId: Type.String({ description: "UUID of the todo list" }),
       todoId: Type.String({ description: "UUID of the todo item" }),

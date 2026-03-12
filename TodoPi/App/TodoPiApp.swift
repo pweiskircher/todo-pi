@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         .appendingPathComponent("todopi-\(UUID().uuidString).sock", isDirectory: false)
     private lazy var piWorkingDirectoryURL = PiLaunchConfiguration.defaultWorkingDirectoryURL()
     private lazy var piConfigDirectoryURL = PiLaunchConfiguration.defaultConfigDirectoryURL()
+    private lazy var bridgeRuntimeInfoURL = PiLaunchConfiguration.defaultBridgeRuntimeInfoURL()
     private lazy var bridgeToken = UUID().uuidString
     private lazy var bridgeServer = PiBridgeServer(
         socketURL: socketURL,
@@ -59,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         preparePiRuntimeEnvironment()
+        startBridgeIfNeeded()
 
         do {
             try commandService.load()
@@ -81,6 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         piSessionManager.stop()
+        bridgeServer.stop()
+        removeBridgeRuntimeInfo()
     }
 
     private func preparePiRuntimeEnvironment() {
@@ -93,6 +97,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         linkSharedPiAuthIfAvailable()
+    }
+
+    private func startBridgeIfNeeded() {
+        do {
+            try bridgeServer.start()
+            publishBridgeRuntimeInfo()
+        } catch {
+            NSLog("Failed to start TodoPi bridge server: \(error.localizedDescription)")
+            PiDebugLog.write("Failed to start TodoPi bridge server: \(error.localizedDescription)")
+        }
+    }
+
+    private func publishBridgeRuntimeInfo() {
+        do {
+            let runtimeInfo = TodoPiBridgeRuntimeInfo(
+                version: 1,
+                socketPath: socketURL.path,
+                token: bridgeToken,
+                processIdentifier: Int32(ProcessInfo.processInfo.processIdentifier),
+                updatedAt: Date()
+            )
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(runtimeInfo)
+            try FileManager.default.createDirectory(
+                at: bridgeRuntimeInfoURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: bridgeRuntimeInfoURL, options: .atomic)
+            PiDebugLog.write("Published bridge runtime info to \(bridgeRuntimeInfoURL.path)")
+        } catch {
+            NSLog("Failed to publish TodoPi bridge runtime info: \(error.localizedDescription)")
+            PiDebugLog.write("Failed to publish TodoPi bridge runtime info: \(error.localizedDescription)")
+        }
+    }
+
+    private func removeBridgeRuntimeInfo() {
+        do {
+            if FileManager.default.fileExists(atPath: bridgeRuntimeInfoURL.path) {
+                try FileManager.default.removeItem(at: bridgeRuntimeInfoURL)
+                PiDebugLog.write("Removed bridge runtime info at \(bridgeRuntimeInfoURL.path)")
+            }
+        } catch {
+            PiDebugLog.write("Failed to remove bridge runtime info: \(error.localizedDescription)")
+        }
     }
 
     private func linkSharedPiAuthIfAvailable() {

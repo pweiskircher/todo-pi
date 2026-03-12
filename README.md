@@ -70,6 +70,40 @@ The app remains the source of truth for:
 
 `pi` acts as an assistant layer on top of that app-owned domain.
 
+## Using TodoPi from normal `pi`
+
+TodoPi now publishes bridge connection info at:
+
+`~/Library/Application Support/TodoPi/bridge-runtime.json`
+
+A global pi extension is included at:
+
+`extensions/todopi.ts`
+
+To install it for your normal pi sessions:
+
+```sh
+mkdir -p ~/.pi/agent/extensions
+cp extensions/todopi.ts ~/.pi/agent/extensions/todopi.ts
+```
+
+Then run `/reload` in pi, or start a new pi session.
+
+Available global tools include:
+
+- `todopi_getLists`
+- `todopi_getTodos`
+- `todopi_createList`
+- `todopi_updateListTitle`
+- `todopi_deleteList`
+- `todopi_createTodo`
+- `todopi_updateTodo`
+- `todopi_setTodoCompletion`
+- `todopi_deleteTodo`
+- `todopi_moveTodo`
+
+There is also a `/todopi-status` command to verify that the running TodoPi app is reachable.
+
 ## Notes
 
 - Chat history is currently in memory only
