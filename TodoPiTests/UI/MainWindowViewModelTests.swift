@@ -33,6 +33,19 @@ final class MainWindowViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.selectedTodoID)
     }
 
+    func testTransientNilListSelectionDoesNotClearCurrentList() {
+        let firstList = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox")
+        let secondList = makeList(id: uuid("00000000-0000-0000-0000-000000000002"), title: "Today")
+        let store = TodoStore(document: TodoDocument.empty().withLists([firstList, secondList]))
+        let viewModel = makeViewModel(store: store)
+
+        viewModel.selectList(id: secondList.id)
+        viewModel.selectList(id: nil)
+
+        XCTAssertEqual(viewModel.selectedListID, secondList.id)
+        XCTAssertEqual(viewModel.selectedList?.title, "Today")
+    }
+
     func testSelectingListDoesNotAutoSelectTodo() {
         let todo = makeTodo(id: uuid("00000000-0000-0000-0000-000000000010"), title: "Buy milk")
         let list = makeList(id: uuid("00000000-0000-0000-0000-000000000001"), title: "Inbox").withTodos([todo])
