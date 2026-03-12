@@ -6,6 +6,7 @@ struct TodoSidebarView: View {
     @State private var editingListID: UUID?
     @State private var editingListTitle = ""
     @State private var pendingDeleteList: TodoList?
+    @State private var sidebarSelection: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -21,12 +22,7 @@ struct TodoSidebarView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(
-                    selection: Binding(
-                        get: { viewModel.selectedListID },
-                        set: { viewModel.selectList(id: $0) }
-                    )
-                ) {
+                List(selection: $sidebarSelection) {
                     ForEach(viewModel.lists) { list in
                         row(for: list)
                             .tag(Optional(list.id))
@@ -52,6 +48,23 @@ struct TodoSidebarView: View {
             }
         }
         .frame(minWidth: 220)
+        .onAppear {
+            sidebarSelection = viewModel.selectedListID
+        }
+        .onChange(of: viewModel.selectedListID) { _, newValue in
+            if sidebarSelection != newValue {
+                sidebarSelection = newValue
+            }
+        }
+        .onChange(of: sidebarSelection) { _, newValue in
+            guard newValue != viewModel.selectedListID else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                viewModel.selectList(id: newValue)
+            }
+        }
         .alert("Delete List?", isPresented: Binding(
             get: { pendingDeleteList != nil },
             set: { if !$0 { pendingDeleteList = nil } }

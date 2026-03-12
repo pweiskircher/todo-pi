@@ -20,6 +20,7 @@ struct TodoListView: View {
     @State private var editingTodoID: UUID?
     @State private var editingTodoTitle = ""
     @State private var pendingDeleteTodo: TodoItem?
+    @State private var todoSelection: UUID?
     @StateObject private var editorFraction: FractionHolder
     @FocusState private var focusedField: FocusedField?
 
@@ -60,6 +61,23 @@ struct TodoListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear {
+            todoSelection = viewModel.selectedTodoID
+        }
+        .onChange(of: viewModel.selectedTodoID) { _, newValue in
+            if todoSelection != newValue {
+                todoSelection = newValue
+            }
+        }
+        .onChange(of: todoSelection) { _, newValue in
+            guard newValue != viewModel.selectedTodoID else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                viewModel.selectTodo(id: newValue)
+            }
+        }
         .onChange(of: focusedField) { oldValue, newValue in
             if oldValue == .listTitle, newValue != .listTitle {
                 viewModel.saveListTitle()
@@ -125,12 +143,7 @@ struct TodoListView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(
-                    selection: Binding(
-                        get: { viewModel.selectedTodoID },
-                        set: { viewModel.selectTodo(id: $0) }
-                    )
-                ) {
+                List(selection: $todoSelection) {
                     ForEach(sortedTodos(in: list)) { todo in
                         row(for: todo)
                             .tag(Optional(todo.id))
