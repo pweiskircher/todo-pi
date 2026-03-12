@@ -72,7 +72,9 @@ The app remains the source of truth for:
 
 ## Using TodoPi from normal `pi`
 
-TodoPi now publishes bridge connection info at:
+TodoPi can also be controlled from regular pi sessions, not just from the in-app chat panel.
+
+On launch, the app starts a local authenticated bridge and publishes connection info at:
 
 `~/Library/Application Support/TodoPi/bridge-runtime.json`
 
@@ -89,7 +91,7 @@ cp extensions/todopi.ts ~/.pi/agent/extensions/todopi.ts
 
 Then run `/reload` in pi, or start a new pi session.
 
-Available global tools include:
+With TodoPi running, normal pi can read and update your app data through these tools:
 
 - `todopi_getLists`
 - `todopi_getTodos`
@@ -103,6 +105,12 @@ Available global tools include:
 - `todopi_moveTodo`
 
 There is also a `/todopi-status` command to verify that the running TodoPi app is reachable.
+
+Example prompts in a normal pi session:
+
+- `Show my TodoPi lists`
+- `Add a todo to the PDFium multithreaded list: investigate thread safety`
+- `Mark "Make useful in SDK" done in TodoPi`
 
 ## Notes
 
