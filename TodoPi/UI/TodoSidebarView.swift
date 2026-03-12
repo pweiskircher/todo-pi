@@ -108,10 +108,16 @@ struct TodoSidebarView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            beginEditing(list)
+        .onTapGesture {
+            viewModel.selectList(id: list.id)
         }
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                beginEditing(list)
+            }
+        )
     }
 
     private func beginEditing(_ list: TodoList) {
