@@ -6,8 +6,6 @@ final class MainWindowViewModel: ObservableObject {
     let store: TodoStore
     let chatViewModel: ChatViewModel
 
-    @Published private(set) var currentDocument: TodoDocument
-    @Published private(set) var currentLoadIssue: TodoRepositoryRecoveryIssue?
     @Published private(set) var selectedListID: UUID?
     @Published private(set) var selectedTodoID: UUID?
     @Published var listTitleDraft = ""
@@ -32,26 +30,20 @@ final class MainWindowViewModel: ObservableObject {
         self.store = store
         self.commandService = commandService
         self.chatViewModel = chatViewModel
-        self.currentDocument = store.document
-        self.currentLoadIssue = store.lastLoadIssue
         self.selectedListID = store.document.lists.first?.id
         self.selectedTodoID = nil
-        syncEditorDrafts(with: lists)
+        syncEditorDrafts(with: store.document.lists)
 
-        store.$document
-            .sink { [weak self] document in
-                guard let self else {
-                    return
-                }
-                self.currentDocument = document
-                self.syncSelection(with: document.lists)
-                self.syncEditorDrafts(with: document.lists)
+        store.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
             }
             .store(in: &cancellables)
 
-        store.$lastLoadIssue
-            .sink { [weak self] issue in
-                self?.currentLoadIssue = issue
+        store.$document
+            .sink { [weak self] document in
+                self?.syncSelection(with: document.lists)
+                self?.syncEditorDrafts(with: document.lists)
             }
             .store(in: &cancellables)
 
@@ -87,7 +79,7 @@ final class MainWindowViewModel: ObservableObject {
     }
 
     var lists: [TodoList] {
-        currentDocument.lists
+        store.document.lists
     }
 
     var selectedList: TodoList? {
@@ -105,31 +97,27 @@ final class MainWindowViewModel: ObservableObject {
     }
 
     var loadIssueDescription: String? {
-        currentLoadIssue?.errorDescription
+        store.lastLoadIssue?.errorDescription
     }
 
     func selectList(id: UUID?) {
-        if id == nil, !lists.isEmpty {
-            return
-        }
-
         persistDraftsIfNeeded()
 
         guard let id else {
             selectedListID = nil
             selectedTodoID = nil
-            syncEditorDrafts(with: lists)
+            syncEditorDrafts(with: store.document.lists)
             return
         }
 
-        guard lists.contains(where: { $0.id == id }) else {
+        guard let list = lists.first(where: { $0.id == id }) else {
             return
         }
 
         selectedListID = id
         selectedTodoID = nil
         editorErrorDescription = nil
-        syncEditorDrafts(with: lists)
+        syncEditorDrafts(with: store.document.lists)
     }
 
     func selectTodo(id: UUID?) {
@@ -137,7 +125,7 @@ final class MainWindowViewModel: ObservableObject {
 
         guard let id else {
             selectedTodoID = nil
-            syncEditorDrafts(with: lists)
+            syncEditorDrafts(with: store.document.lists)
             return
         }
 
@@ -147,7 +135,7 @@ final class MainWindowViewModel: ObservableObject {
 
         selectedTodoID = id
         editorErrorDescription = nil
-        syncEditorDrafts(with: lists)
+        syncEditorDrafts(with: store.document.lists)
     }
 
     func createList() {
@@ -158,7 +146,7 @@ final class MainWindowViewModel: ObservableObject {
             selectedListID = list.id
             selectedTodoID = nil
             editorErrorDescription = nil
-            syncEditorDrafts(with: lists)
+            syncEditorDrafts(with: store.document.lists)
         } catch {
             editorErrorDescription = error.localizedDescription
         }
@@ -187,7 +175,7 @@ final class MainWindowViewModel: ObservableObject {
             )
             selectedTodoID = todo.id
             editorErrorDescription = nil
-            syncEditorDrafts(with: lists)
+            syncEditorDrafts(with: store.document.lists)
         } catch {
             editorErrorDescription = error.localizedDescription
         }
@@ -305,7 +293,7 @@ final class MainWindowViewModel: ObservableObject {
 
     func discardTodoEdits() {
         editorErrorDescription = nil
-        syncEditorDrafts(with: lists)
+        syncEditorDrafts(with: store.document.lists)
     }
 
     func toggleCompletion(for todoID: UUID) {
