@@ -352,14 +352,6 @@ struct TodoListView: View {
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .onTapGesture {
-            viewModel.selectTodo(id: todo.id)
-        }
-        .simultaneousGesture(
-            TapGesture(count: 2).onEnded {
-                beginEditing(todo)
-            }
-        )
     }
 
     private func beginEditing(_ todo: TodoItem) {
