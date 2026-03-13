@@ -42,13 +42,8 @@ struct TodoListView: View {
 
                     Divider()
 
-                    if let todo = viewModel.selectedTodo {
-                        GeometryReader { proxy in
-                            editorSplit(for: list, todo: todo, availableHeight: proxy.size.height)
-                        }
-                    } else {
-                        todoListSection(for: list)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    GeometryReader { proxy in
+                        editorSplit(for: list, availableHeight: proxy.size.height)
                     }
                 }
             } else {
@@ -88,7 +83,6 @@ struct TodoListView: View {
                 viewModel.saveTodoBody()
             }
         }
-        .animation(.spring(response: 0.24, dampingFraction: 0.9), value: viewModel.selectedTodoID)
         .onDisappear {
             viewModel.persistDraftsIfNeeded()
         }
@@ -110,15 +104,21 @@ struct TodoListView: View {
         }
     }
 
-    private func editorSplit(for list: TodoList, todo: TodoItem, availableHeight: CGFloat) -> some View {
+    private func editorSplit(for list: TodoList, availableHeight: CGFloat) -> some View {
         VSplit(
             top: {
                 todoListSection(for: list)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             },
             bottom: {
-                todoDetailsSection(for: todo)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Group {
+                    if let todo = viewModel.selectedTodo {
+                        todoDetailsSection(for: todo)
+                    } else {
+                        todoPlaceholderSection()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         )
         .fraction(editorFraction)
@@ -130,7 +130,6 @@ struct TodoListView: View {
         .splitter {
             Splitter.line(color: Color(nsColor: .separatorColor), visibleThickness: Layout.dividerThickness)
         }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private func todoListSection(for list: TodoList) -> some View {
@@ -213,20 +212,35 @@ struct TodoListView: View {
             .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    private func todoPlaceholderSection() -> some View {
+        VStack {
+            Spacer()
+
+            Text("Select a Todo")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 32)
+                .frame(maxWidth: .infinity)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            Spacer()
+        }
+        .padding(16)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
     private func todoDetailsCard(for todo: TodoItem) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                if todo.isCompleted {
-                    Label("Completed", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.subheadline.weight(.medium))
-                } else {
-                    Label("Selected", systemImage: "circle.inset.filled")
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline.weight(.medium))
-                }
-
-                Spacer()
+            if todo.isCompleted {
+                Label("Completed", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.subheadline.weight(.medium))
             }
 
             TextField("Todo title", text: todoTitleBinding)
